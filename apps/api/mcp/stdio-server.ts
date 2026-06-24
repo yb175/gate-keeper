@@ -31,10 +31,39 @@ export class StdioMCPServer implements MCPServer {
           },
         );
 
+        const allowedKeys = [
+          "PATH",
+          "HOME",
+          "USER",
+          "LOGNAME",
+          "SHELL",
+          "LANG",
+          "LC_ALL",
+          "LC_CTYPE",
+          "TMPDIR",
+          "TMP",
+          "TEMP",
+          // Windows environment variables
+          "SYSTEMROOT",
+          "APPDATA",
+          "LOCALAPPDATA",
+          "COMSPEC",
+          "PATHEXT",
+          "USERPROFILE",
+          "USERNAME",
+        ];
+
+        const minimalEnv: Record<string, string> = {};
+        for (const key of allowedKeys) {
+          if (process.env[key] !== undefined) {
+            minimalEnv[key] = process.env[key]!;
+          }
+        }
+
         const mergedEnv = {
-          ...process.env,
+          ...minimalEnv,
           ...this.env,
-        } as Record<string, string>;
+        };
 
         this.transport = new StdioClientTransport({
           command: this.command,

@@ -63,6 +63,8 @@ app.post("/mcp/execute", async (req, res) => {
       res.status(400).json({ error: errMsg });
     } else if (errMsg.includes("Tool not found")) {
       res.status(404).json({ error: errMsg });
+    } else if (errMsg.includes("rejected with decision")) {
+      res.status(403).json({ error: errMsg });
     } else {
       res.status(500).json({ error: "Failed to execute tool" });
     }

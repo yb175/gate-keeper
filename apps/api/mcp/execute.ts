@@ -44,6 +44,18 @@ export class ToolExecutor {
       throw error;
     }
 
+    if (decision !== "ALLOW") {
+      const error = new Error(`Tool execution rejected with decision: ${decision}`);
+      logger.error("Tool execution failed: Denied by policy", {
+        tool_name: toolName,
+        decision,
+        conversation_id: conversationId,
+        duration_ms: 0,
+        error_message: error.message,
+      });
+      throw error;
+    }
+
     try {
       // 2. Discover Tools (uses cache internally)
       const discovered = await this.discovery.discoverTools();

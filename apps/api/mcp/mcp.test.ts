@@ -4,6 +4,7 @@ import { ToolsDiscovery } from "./discovery.js";
 import { ToolExecutor } from "./execute.js";
 import { MCPServer, Tool } from "../types.js";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { StdioMCPServer } from "./stdio-server.js";
 import { logger } from "./logger.js";
@@ -303,6 +304,29 @@ describe("MCP Production-Ready Module", () => {
       expect(infoLog.duration_ms).toBeGreaterThanOrEqual(0);
     });
 
+    it("should reject tool execution if the decision is not ALLOW", async () => {
+      const mockTool: Tool = {
+        name: "mathAdd",
+        description: "add two numbers",
+        inputSchema: {},
+        execute: async (args: any) => args.a + args.b,
+      };
+      registry.registerPlugin(new MockMCPServer("mathServer", [mockTool]));
+
+      await expect(
+        executor.execute(
+          "mathAdd",
+          { a: 2, b: 3 },
+          { decision: "DENY", conversationId: "convDenied" },
+        )
+      ).rejects.toThrow("Tool execution rejected with decision: DENY");
+
+      const errLog = loggedItems.find((log) => log.level === "error" && log.conversation_id === "convDenied");
+      expect(errLog).toBeDefined();
+      expect(errLog.message).toBe("Tool execution failed: Denied by policy");
+      expect(errLog.decision).toBe("DENY");
+    });
+
     it("should throw an error for empty tool name", async () => {
       await expect(executor.execute("", {})).rejects.toThrow(
         "Tool name cannot be empty",
@@ -378,7 +402,18 @@ describe("MCP Production-Ready Module", () => {
 
   describe("StdioMCPServer Integration with file-manager-mcp", () => {
     it("should list tools and execute file-manager-mcp tools successfully", async () => {
-      const projectRoot = path.resolve(__dirname, "../../..");
+      // Resolve project root dynamically by searching upwards for turbo.json
+      const findProjectRoot = (startDir: string): string => {
+        let current = startDir;
+        while (current !== path.parse(current).root) {
+          if (fs.existsSync(path.join(current, "turbo.json"))) {
+            return current;
+          }
+          current = path.dirname(current);
+        }
+        return path.resolve(startDir, "../../..");
+      };
+      const projectRoot = findProjectRoot(__dirname);
       const fmSource = path.join(
         projectRoot,
         "apps/file-manager-mcp/src/index.ts",
