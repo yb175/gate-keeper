@@ -80,6 +80,29 @@ describe("FileManager MCP Server Tools", () => {
         await fs.rm(extFile, { force: true });
       } catch (e) {}
     });
+
+    it("allows valid paths inside the sandbox even if the sandbox directory does not exist yet", async () => {
+      const backupPath = SANDBOX_ROOT + "-backup";
+      let sandboxExists = false;
+      try {
+        await fs.access(SANDBOX_ROOT);
+        sandboxExists = true;
+        await fs.rename(SANDBOX_ROOT, backupPath);
+      } catch (err: any) {
+        if (err.code !== "ENOENT") throw err;
+      }
+
+      try {
+        const p = validatePath("bootstrap-test.txt");
+        expect(p).toBe(path.resolve(SANDBOX_ROOT, "bootstrap-test.txt"));
+      } finally {
+        if (sandboxExists) {
+          try {
+            await fs.rename(backupPath, SANDBOX_ROOT);
+          } catch (e) {}
+        }
+      }
+    });
   });
 
   describe("write_file and read_file", () => {

@@ -9,6 +9,9 @@ export const SANDBOX_ROOT = path.resolve(__dirname, "../../sandbox");
 export const REAL_SANDBOX_ROOT = fs.existsSync(SANDBOX_ROOT) ? fs.realpathSync(SANDBOX_ROOT) : SANDBOX_ROOT;
 
 function getRealPathSafe(p: string): string {
+  if (p === REAL_SANDBOX_ROOT) {
+    return REAL_SANDBOX_ROOT;
+  }
   try {
     return fs.realpathSync(p);
   } catch (err: any) {
@@ -37,16 +40,16 @@ export function validatePath(filepath: string): string {
 
   const resolved = path.resolve(REAL_SANDBOX_ROOT, cleanPath);
 
-  // 1. Fast syntactic check
+  // 1. Fast syntactic check (isAbsolute protects against cross-drive escapes on Windows)
   const relative = path.relative(REAL_SANDBOX_ROOT, resolved);
-  if (relative.startsWith("..")) {
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error(`Access denied: Path '${filepath}' escapes the sandbox.`);
   }
 
   // 2. Resolve symlinks of closest existing ancestor to prevent traversal bypasses
   const realAncestor = getRealPathSafe(resolved);
   const realRelative = path.relative(REAL_SANDBOX_ROOT, realAncestor);
-  if (realRelative.startsWith("..")) {
+  if (realRelative.startsWith("..") || path.isAbsolute(realRelative)) {
     throw new Error(`Access denied: Path '${filepath}' resolves outside the sandbox.`);
   }
 
