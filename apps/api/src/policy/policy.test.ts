@@ -147,6 +147,13 @@ describe("Policy Engine Rules & Orchestrator", () => {
       expect(res.result).toBe(false);
       expect(res.reason).toBe("Conversation conv-missing not found");
     });
+
+    it("should return success:false if conversationId is missing or unknown", async () => {
+      const res = await budgetExceeded("unknown", 10);
+      expect(res.success).toBe(false);
+      expect(res.result).toBe(false);
+      expect(res.reason).toBe("Conversation context is missing or unknown");
+    });
   });
 
   describe("Rule: needsApproval", () => {

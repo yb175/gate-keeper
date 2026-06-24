@@ -7,11 +7,12 @@ export default async function budgetExceeded(
   token: number,
 ): Promise<RuleResult<boolean>> {
   try {
-    // If the conversation context is unknown or missing, skip budget limit checking
+    // Reject executions without valid conversation context to prevent bypassing budget limits
     if (!conversationId || conversationId === "unknown") {
       return {
-        success: true,
+        success: false,
         result: false,
+        reason: "Conversation context is missing or unknown",
       };
     }
 

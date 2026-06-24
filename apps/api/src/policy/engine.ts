@@ -76,7 +76,7 @@ export default async function PolicyEngine(
     }
 
     // 3. Approval Check
-    const approvalResult = await needsApproval(tool_name);
+    const approvalResult = await needsApproval(tool_name, policy);
     if (!approvalResult.success) {
       return {
         allowed: false,
