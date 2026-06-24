@@ -31,6 +31,7 @@ vi.mock("@repo/db", () => {
         findUnique: vi.fn(),
         findFirst: vi.fn(),
         create: vi.fn(),
+        delete: vi.fn(),
       },
     },
   };
@@ -320,6 +321,9 @@ describe("Decision Orchestration (decide)", () => {
     );
 
     expect(res.decision).toBe("ALLOW");
+    expect(db.approval.delete).toHaveBeenCalledWith({
+      where: { id: "app-id-123" },
+    });
   });
 
   it("should return DENY when retrieved approval tool_name does not match the requesting tool_name", async () => {

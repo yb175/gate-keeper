@@ -7,6 +7,14 @@ export default async function budgetExceeded(
   token: number,
 ): Promise<RuleResult<boolean>> {
   try {
+    // If the conversation context is unknown or missing, skip budget limit checking
+    if (!conversationId || conversationId === "unknown") {
+      return {
+        success: true,
+        result: false,
+      };
+    }
+
     const conversation = await db.conversation.findUnique({
       where: { id: conversationId },
     });
@@ -31,7 +39,7 @@ export default async function budgetExceeded(
     logger.error("Database query failed in budgetExceeded rule", {
       conversation_id: conversationId,
       token,
-      error_message: error.message || String(error),
+      error_message: error instanceof Error ? error.message : String(error),
     });
     return {
       success: false,

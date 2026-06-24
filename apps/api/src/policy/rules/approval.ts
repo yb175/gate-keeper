@@ -14,8 +14,11 @@ export default async function needsApproval(
             where: { tool_name },
           });
 
-    // Implicit fallback: if no policy is registered, default to APPROVAL
-    const action = policy ? policy.action : PolicyAction.APPROVAL;
+    // Implicit fallback: if no policy is registered or has invalid/missing action, default to APPROVAL
+    const action =
+      policy && Object.values(PolicyAction).includes(policy.action)
+        ? policy.action
+        : PolicyAction.APPROVAL;
 
     return {
       success: true,
@@ -24,7 +27,7 @@ export default async function needsApproval(
   } catch (error: any) {
     logger.error("Database query failed in needsApproval rule", {
       tool_name,
-      error_message: error.message || String(error),
+      error_message: error instanceof Error ? error.message : String(error),
     });
 
     return {

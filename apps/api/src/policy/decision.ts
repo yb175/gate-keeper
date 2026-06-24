@@ -64,6 +64,9 @@ export async function decide(
 
       switch (approval.status) {
         case ApprovalStatus.APPROVED:
+          await db.approval.delete({
+            where: { id: approval.id },
+          });
           return {
             decision: "ALLOW",
           };

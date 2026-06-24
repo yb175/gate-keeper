@@ -28,7 +28,7 @@ export default async function isblocked(
   } catch (error: any) {
     logger.error("Database query failed in isblocked rule", {
       tool_name,
-      error_message: error.message || String(error),
+      error_message: error instanceof Error ? error.message : String(error),
     });
 
     return {

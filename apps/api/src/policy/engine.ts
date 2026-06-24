@@ -76,7 +76,7 @@ export default async function PolicyEngine(
     }
 
     // 3. Approval Check
-    const approvalResult = await needsApproval(tool_name, policy);
+    const approvalResult = await needsApproval(tool_name);
     if (!approvalResult.success) {
       return {
         allowed: false,
@@ -101,7 +101,7 @@ export default async function PolicyEngine(
     return {
       allowed: false,
       requiresApproval: false,
-      reason: error?.message || "Internal policy engine failure",
+      reason: error instanceof Error ? error.message : String(error),
     };
   }
 }

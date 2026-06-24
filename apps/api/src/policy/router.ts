@@ -23,8 +23,8 @@ router.get(
   "/policies/:toolName",
   async (req: Request, res: Response): Promise<void> => {
     const { toolName } = req.params;
-    if (!toolName) {
-      res.status(400).json({ error: "Missing toolName parameter" });
+    if (!toolName || !toolName.trim()) {
+      res.status(400).json({ error: "Missing or invalid toolName parameter" });
       return;
     }
     const normalizedToolName = toolName.trim();
@@ -110,8 +110,8 @@ router.patch(
   "/policies/:toolName",
   async (req: Request, res: Response): Promise<void> => {
     const { toolName } = req.params;
-    if (!toolName) {
-      res.status(400).json({ error: "Missing toolName parameter" });
+    if (!toolName || !toolName.trim()) {
+      res.status(400).json({ error: "Missing or invalid toolName parameter" });
       return;
     }
     const { action } = req.body;
@@ -160,8 +160,8 @@ router.delete(
   "/policies/:toolName",
   async (req: Request, res: Response): Promise<void> => {
     const { toolName } = req.params;
-    if (!toolName) {
-      res.status(400).json({ error: "Missing toolName parameter" });
+    if (!toolName || !toolName.trim()) {
+      res.status(400).json({ error: "Missing or invalid toolName parameter" });
       return;
     }
     const normalizedToolName = toolName.trim();
