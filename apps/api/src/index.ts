@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { formatDate } from "@repo/shared";
 import { mcpDiscovery, mcpExecutor } from "../mcp/bootstrap.js";
 import { AppError } from "../types.js";
+import policiesRouter from "./policy/router.js";
 
 dotenv.config();
 
@@ -12,6 +13,7 @@ const port = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+app.use(policiesRouter);
 
 // Health check endpoint
 app.get("/health", (req, res) => {

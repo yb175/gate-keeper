@@ -29,4 +29,25 @@ export class AppError extends Error {
     }
   }
 }
+export enum ApprovalStatus {
+  PENDING = "PENDING",
+  APPROVED = "APPROVED",
+  REJECTED = "REJECTED",
+}
 
+export interface ApprovalRequest {
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  status?: ApprovalStatus;
+  approvalId?: string;
+}
+export interface RuleResult<T> {
+  success: boolean;
+  result: T;
+  reason?: string;
+}
+
+export interface ConversationRequest {
+  conversationId: string;
+  token: number;
+}

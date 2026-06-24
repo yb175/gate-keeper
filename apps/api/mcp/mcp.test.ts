@@ -9,7 +9,6 @@ import { fileURLToPath } from "url";
 import { StdioMCPServer } from "./stdio-server.js";
 import { logger } from "./logger.js";
 
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -277,7 +276,6 @@ describe("MCP Production-Ready Module", () => {
     });
   });
 
-
   describe("ToolExecutor Execution & Safeness", () => {
     it("should execute a registered tool successfully (Happy Path)", async () => {
       const mockTool: Tool = {
@@ -318,10 +316,12 @@ describe("MCP Production-Ready Module", () => {
           "mathAdd",
           { a: 2, b: 3 },
           { decision: "DENY", conversationId: "convDenied" },
-        )
+        ),
       ).rejects.toThrow("Tool execution rejected with decision: DENY");
 
-      const errLog = loggedItems.find((log) => log.level === "error" && log.conversation_id === "convDenied");
+      const errLog = loggedItems.find(
+        (log) => log.level === "error" && log.conversation_id === "convDenied",
+      );
       expect(errLog).toBeDefined();
       expect(errLog.message).toBe("Tool execution failed: Denied by policy");
       expect(errLog.decision).toBe("DENY");
@@ -506,9 +506,21 @@ describe("MCP Production-Ready Module", () => {
 
   describe("Logger Metadata Protection", () => {
     it("should prevent overriding core properties via meta argument", () => {
-      logger.info("Main message", { level: "hacked", message: "spoofed message", extra: "valid" });
-      logger.warn("Main message", { level: "hacked", message: "spoofed message", extra: "valid" });
-      logger.error("Main message", { level: "hacked", message: "spoofed message", extra: "valid" });
+      logger.info("Main message", {
+        level: "hacked",
+        message: "spoofed message",
+        extra: "valid",
+      });
+      logger.warn("Main message", {
+        level: "hacked",
+        message: "spoofed message",
+        extra: "valid",
+      });
+      logger.error("Main message", {
+        level: "hacked",
+        message: "spoofed message",
+        extra: "valid",
+      });
 
       const infoLogs = loggedItems.filter((log) => log.extra === "valid");
       expect(infoLogs.length).toBe(3);
@@ -524,4 +536,3 @@ describe("MCP Production-Ready Module", () => {
     });
   });
 });
-
