@@ -44,7 +44,7 @@ app.post("/mcp/execute", async (req, res) => {
     let timeoutMs: number | undefined = undefined;
     if (req.body.timeoutMs !== undefined) {
       const parsed = Number(req.body.timeoutMs);
-      if (!Number.isNaN(parsed) && parsed > 0) {
+      if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 60000) {
         timeoutMs = parsed;
       }
     }

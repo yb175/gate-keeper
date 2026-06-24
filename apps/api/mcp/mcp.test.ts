@@ -6,6 +6,8 @@ import { MCPServer, Tool } from "../types.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { StdioMCPServer } from "./stdio-server.js";
+import { logger } from "./logger.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -228,7 +230,52 @@ describe("MCP Production-Ready Module", () => {
       const result = await discovery.discoverTools();
       expect(result.has("dup")).toBe(true);
     });
+
+    it("should not clear a newer discovery promise if a stale promise is rejected", async () => {
+      const mockTool1: Tool = {
+        name: "dup",
+        description: "d",
+        inputSchema: {},
+        execute: async () => {},
+      };
+      const mockTool2: Tool = {
+        name: "dup",
+        description: "d",
+        inputSchema: {},
+        execute: async () => {},
+      };
+
+      const plugin1 = new MockMCPServer("server1", [mockTool1]);
+      const plugin2 = new MockMCPServer("server2", [mockTool2]);
+
+      registry.registerPlugin(plugin1);
+      registry.registerPlugin(plugin2);
+
+      // Start the first discovery call which will fail due to duplicate names
+      const p1 = discovery.discoverTools();
+      const p1_internal = (discovery as any).discoveryPromise;
+
+      // Resolve the conflict by unregistering the second server
+      registry.unregisterPlugin("server2");
+
+      // Start a second discovery call with forceRefresh = true
+      const p2 = discovery.discoverTools(true);
+      const p2_internal = (discovery as any).discoveryPromise;
+
+      // Wait for the first promise to reject
+      await expect(p1).rejects.toThrow("already registered");
+
+      // Verify that the cached promise is NOT null and is still the second internal promise
+      const pAfter = (discovery as any).discoveryPromise;
+      expect(pAfter).not.toBeNull();
+      expect(pAfter).toBe(p2_internal);
+
+      // Verify that p2 successfully resolves
+      const resolved = await p2;
+      expect(resolved.has("dup")).toBe(true);
+    });
   });
+
 
   describe("ToolExecutor Execution & Safeness", () => {
     it("should execute a registered tool successfully (Happy Path)", async () => {
@@ -376,4 +423,25 @@ describe("MCP Production-Ready Module", () => {
       }
     }, 30000); // 30s timeout for downloading and starting context7
   });
+
+  describe("Logger Metadata Protection", () => {
+    it("should prevent overriding core properties via meta argument", () => {
+      logger.info("Main message", { level: "hacked", message: "spoofed message", extra: "valid" });
+      logger.warn("Main message", { level: "hacked", message: "spoofed message", extra: "valid" });
+      logger.error("Main message", { level: "hacked", message: "spoofed message", extra: "valid" });
+
+      const infoLogs = loggedItems.filter((log) => log.extra === "valid");
+      expect(infoLogs.length).toBe(3);
+
+      expect(infoLogs[0].level).toBe("info");
+      expect(infoLogs[0].message).toBe("Main message");
+
+      expect(infoLogs[1].level).toBe("warn");
+      expect(infoLogs[1].message).toBe("Main message");
+
+      expect(infoLogs[2].level).toBe("error");
+      expect(infoLogs[2].message).toBe("Main message");
+    });
+  });
 });
+

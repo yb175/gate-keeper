@@ -54,19 +54,12 @@ export class ToolExecutor {
       }
 
       // 3. Execution Timeout Safeness
-      let timeout = options?.timeoutMs ?? 10000;
-
-      const MAX_TIMEOUT_MS = 60000; // 60 seconds max
-      const MIN_TIMEOUT_MS = 1; // 1 ms min
-
-      if (
-        typeof timeout !== "number" ||
-        Number.isNaN(timeout) ||
-        timeout < MIN_TIMEOUT_MS
-      ) {
-        timeout = 10000;
-      } else if (timeout > MAX_TIMEOUT_MS) {
-        timeout = MAX_TIMEOUT_MS;
+      let timeout = 10000;
+      const rawTimeout = options?.timeoutMs;
+      if (typeof rawTimeout === "number" && !Number.isNaN(rawTimeout)) {
+        if (rawTimeout >= 1 && rawTimeout <= 60000) {
+          timeout = rawTimeout;
+        }
       }
 
       let timerId: NodeJS.Timeout | undefined;

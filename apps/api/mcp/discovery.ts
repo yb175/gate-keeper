@@ -16,10 +16,13 @@ export class ToolsDiscovery {
     forceRefresh = false,
   ): Promise<Map<string, DiscoveredTool>> {
     if (forceRefresh || !this.discoveryPromise) {
-      this.discoveryPromise = this.performDiscovery().catch((error) => {
-        this.discoveryPromise = null;
+      const promise = this.performDiscovery().catch((error) => {
+        if (this.discoveryPromise === promise) {
+          this.discoveryPromise = null;
+        }
         throw error;
       });
+      this.discoveryPromise = promise;
     }
     return this.discoveryPromise;
   }
