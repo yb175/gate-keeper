@@ -27,6 +27,15 @@ export const moveFile: Tool = {
     const resolvedSource = validatePath(args.source);
     const resolvedDest = validatePath(args.destination);
     
+    try {
+      await fs.access(resolvedDest);
+      throw new Error(`Destination file '${args.destination}' already exists.`);
+    } catch (err: any) {
+      if (err.code !== "ENOENT") {
+        throw err;
+      }
+    }
+    
     await fs.mkdir(path.dirname(resolvedDest), { recursive: true });
     await fs.rename(resolvedSource, resolvedDest);
     return "File moved successfully";

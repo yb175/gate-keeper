@@ -42,6 +42,44 @@ describe("FileManager MCP Server Tools", () => {
       expect(() => validatePath("sandbox/../../etc/passwd")).toThrow();
       expect(() => validatePath("../test.txt")).toThrow();
     });
+
+    it("throws an error for symlink traversal escaping the sandbox", async () => {
+      const extDir = path.resolve(SANDBOX_ROOT, "../temp-outside-dir");
+      await fs.mkdir(extDir, { recursive: true });
+      
+      const extFile = path.resolve(SANDBOX_ROOT, "../temp-outside-file.txt");
+      await fs.writeFile(extFile, "secret content", "utf-8");
+
+      const symlinkDirPath = path.resolve(SANDBOX_ROOT, "symlink_dir");
+      const symlinkFilePath = path.resolve(SANDBOX_ROOT, "symlink_file.txt");
+
+      try {
+        await fs.symlink(extDir, symlinkDirPath, "dir");
+      } catch (err: any) {
+        if (err.code !== "EEXIST") throw err;
+      }
+
+      try {
+        await fs.symlink(extFile, symlinkFilePath, "file");
+      } catch (err: any) {
+        if (err.code !== "EEXIST") throw err;
+      }
+
+      expect(() => validatePath("symlink_dir/test.txt")).toThrow();
+      expect(() => validatePath("symlink_file.txt")).toThrow();
+
+      try {
+        await fs.unlink(symlinkDirPath);
+      } catch (e) {}
+      try {
+        await fs.unlink(symlinkFilePath);
+      } catch (e) {}
+      
+      try {
+        await fs.rm(extDir, { recursive: true, force: true });
+        await fs.rm(extFile, { force: true });
+      } catch (e) {}
+    });
   });
 
   describe("write_file and read_file", () => {
@@ -101,6 +139,21 @@ describe("FileManager MCP Server Tools", () => {
       await expect(fs.access(path.join(SANDBOX_ROOT, src))).rejects.toThrow();
       const destContent = await readFile.execute({ path: dest });
       expect(destContent).toBe(content);
+    });
+
+    it("cannot move if destination file already exists", async () => {
+      const src = "move-source-exist.txt";
+      const dest = "move-dest-exist.txt";
+
+      await writeFile.execute({ path: src, content: "source" });
+      await writeFile.execute({ path: dest, content: "destination" });
+
+      await expect(
+        moveFile.execute({ source: src, destination: dest })
+      ).rejects.toThrow();
+
+      await deleteFile.execute({ path: src });
+      await deleteFile.execute({ path: dest });
     });
 
     it("cannot move source from outside sandbox", async () => {
