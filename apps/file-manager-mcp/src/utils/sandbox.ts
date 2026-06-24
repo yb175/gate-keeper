@@ -6,7 +6,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const SANDBOX_ROOT = path.resolve(__dirname, "../../sandbox");
-export const REAL_SANDBOX_ROOT = fs.existsSync(SANDBOX_ROOT) ? fs.realpathSync(SANDBOX_ROOT) : SANDBOX_ROOT;
+export const REAL_SANDBOX_ROOT = (() => {
+  const parent = path.dirname(SANDBOX_ROOT);
+  const canonicalParent = fs.existsSync(parent) ? fs.realpathSync(parent) : parent;
+  return path.resolve(canonicalParent, path.basename(SANDBOX_ROOT));
+})();
 
 function getRealPathSafe(p: string): string {
   if (p === REAL_SANDBOX_ROOT) {
