@@ -17,7 +17,7 @@ graph TD
     subgraph MCP Server (file-manager-mcp)
         Server[server.ts<br/>MCP Server]
         Registry[registry.ts<br/>Tool Registry]
-        
+
         subgraph Tools
             RF[readFile.ts]
             WF[writeFile.ts]
@@ -25,7 +25,7 @@ graph TD
             MF[moveFile.ts]
             LF[listFiles.ts]
         end
-        
+
         Sandbox[utils/sandbox.ts<br/>validatePath]
     end
 
@@ -74,6 +74,7 @@ apps/file-manager-mcp/
 All operations are sandboxed inside the `./sandbox` folder.
 
 The `validatePath(filepath: string): string` utility in `src/utils/sandbox.ts`:
+
 1. Strips any optional `"sandbox/"` or `"sandbox\"` prefix from inputs.
 2. Resolves the full path relative to the absolute path of `./sandbox`.
 3. Verifies that the resolved path does not escape the sandbox root (using `path.relative` to check for `..` or absolute paths).
@@ -84,7 +85,9 @@ The `validatePath(filepath: string): string` utility in `src/utils/sandbox.ts`:
 ## Exposed Tools
 
 ### 1. `read_file`
+
 Reads the raw text content of a file.
+
 - **Input Schema**:
   ```json
   {
@@ -94,7 +97,9 @@ Reads the raw text content of a file.
 - **Returns**: File text content.
 
 ### 2. `write_file`
+
 Creates or overwrites a file with content (automatically creates missing subdirectories).
+
 - **Input Schema**:
   ```json
   {
@@ -105,7 +110,9 @@ Creates or overwrites a file with content (automatically creates missing subdire
 - **Returns**: `"File written successfully"`
 
 ### 3. `delete_file`
+
 Deletes a file.
+
 - **Input Schema**:
   ```json
   {
@@ -115,7 +122,9 @@ Deletes a file.
 - **Returns**: `"File deleted successfully"`
 
 ### 4. `move_file`
+
 Moves or renames a file.
+
 - **Input Schema**:
   ```json
   {
@@ -126,7 +135,9 @@ Moves or renames a file.
 - **Returns**: `"File moved successfully"`
 
 ### 5. `list_files`
+
 Lists all files recursively under the sandbox root, returning paths relative to the sandbox.
+
 - **Input Schema**: `{}`
 - **Returns**: `["a.txt", "sub/b.txt"]`
 
@@ -137,11 +148,13 @@ Lists all files recursively under the sandbox root, returning paths relative to 
 We use [Vitest](https://vitest.dev/) for unit and integration testing.
 
 To run the test suite, run the following command in `apps/file-manager-mcp/`:
+
 ```bash
 npm run test
 ```
 
 This verifies that:
+
 - Operations correctly read, write, list, move, and delete files inside the sandbox.
 - Path traversal escapes are blocked.
 
@@ -152,6 +165,7 @@ This verifies that:
 The MCP Inspector is an interactive web-based interface for debugging.
 
 To run the server inside the inspector, execute:
+
 ```bash
 npm run inspector
 ```

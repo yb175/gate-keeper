@@ -18,7 +18,10 @@ describe("FileManager MCP Server Tools", () => {
     try {
       const files = await fs.readdir(SANDBOX_ROOT);
       for (const file of files) {
-        await fs.rm(path.join(SANDBOX_ROOT, file), { recursive: true, force: true });
+        await fs.rm(path.join(SANDBOX_ROOT, file), {
+          recursive: true,
+          force: true,
+        });
       }
     } catch (e) {
       // Ignore
@@ -47,7 +50,7 @@ describe("FileManager MCP Server Tools", () => {
     it("throws an error for symlink traversal escaping the sandbox", async () => {
       const extDir = path.resolve(SANDBOX_ROOT, "../temp-outside-dir");
       await fs.mkdir(extDir, { recursive: true });
-      
+
       const extFile = path.resolve(SANDBOX_ROOT, "../temp-outside-file.txt");
       await fs.writeFile(extFile, "secret content", "utf-8");
 
@@ -75,7 +78,7 @@ describe("FileManager MCP Server Tools", () => {
       try {
         await fs.unlink(symlinkFilePath);
       } catch (e) {}
-      
+
       try {
         await fs.rm(extDir, { recursive: true, force: true });
         await fs.rm(extFile, { force: true });
@@ -111,13 +114,15 @@ describe("FileManager MCP Server Tools", () => {
       await fs.mkdir(tempTarget, { recursive: true });
       try {
         await fs.symlink(tempTarget, tempSandbox, "dir");
-        
+
         const resolveSandbox = (rootPath: string) => {
           if (fsSync.existsSync(rootPath)) {
             return fsSync.realpathSync(rootPath);
           }
           const parent = path.dirname(rootPath);
-          const canonicalParent = fsSync.existsSync(parent) ? fsSync.realpathSync(parent) : parent;
+          const canonicalParent = fsSync.existsSync(parent)
+            ? fsSync.realpathSync(parent)
+            : parent;
           return path.resolve(canonicalParent, path.basename(rootPath));
         };
 
@@ -142,7 +147,10 @@ describe("FileManager MCP Server Tools", () => {
       const writeResult = await writeFile.execute({ path: filename, content });
       expect(writeResult).toBe("File written successfully");
 
-      const diskContent = await fs.readFile(path.join(SANDBOX_ROOT, filename), "utf-8");
+      const diskContent = await fs.readFile(
+        path.join(SANDBOX_ROOT, filename),
+        "utf-8",
+      );
       expect(diskContent).toBe(content);
 
       const readResult = await readFile.execute({ path: filename });
@@ -151,13 +159,13 @@ describe("FileManager MCP Server Tools", () => {
 
     it("cannot write outside sandbox", async () => {
       await expect(
-        writeFile.execute({ path: "../../escape.txt", content: "evil" })
+        writeFile.execute({ path: "../../escape.txt", content: "evil" }),
       ).rejects.toThrow();
     });
 
     it("cannot read outside sandbox", async () => {
       await expect(
-        readFile.execute({ path: "../../escape.txt" })
+        readFile.execute({ path: "../../escape.txt" }),
       ).rejects.toThrow();
     });
   });
@@ -166,7 +174,10 @@ describe("FileManager MCP Server Tools", () => {
     it("lists all files in the sandbox", async () => {
       const existingFiles = await fs.readdir(SANDBOX_ROOT);
       for (const f of existingFiles) {
-        await fs.rm(path.join(SANDBOX_ROOT, f), { recursive: true, force: true });
+        await fs.rm(path.join(SANDBOX_ROOT, f), {
+          recursive: true,
+          force: true,
+        });
       }
 
       await writeFile.execute({ path: "file1.txt", content: "1" });
@@ -185,7 +196,10 @@ describe("FileManager MCP Server Tools", () => {
 
       await writeFile.execute({ path: src, content });
 
-      const moveResult = await moveFile.execute({ source: src, destination: dest });
+      const moveResult = await moveFile.execute({
+        source: src,
+        destination: dest,
+      });
       expect(moveResult).toBe("File moved successfully");
 
       await expect(fs.access(path.join(SANDBOX_ROOT, src))).rejects.toThrow();
@@ -201,7 +215,7 @@ describe("FileManager MCP Server Tools", () => {
       await writeFile.execute({ path: dest, content: "destination" });
 
       await expect(
-        moveFile.execute({ source: src, destination: dest })
+        moveFile.execute({ source: src, destination: dest }),
       ).rejects.toThrow();
 
       await deleteFile.execute({ path: src });
@@ -210,13 +224,19 @@ describe("FileManager MCP Server Tools", () => {
 
     it("cannot move source from outside sandbox", async () => {
       await expect(
-        moveFile.execute({ source: "../../outside.txt", destination: "inside.txt" })
+        moveFile.execute({
+          source: "../../outside.txt",
+          destination: "inside.txt",
+        }),
       ).rejects.toThrow();
     });
 
     it("cannot move dest to outside sandbox", async () => {
       await expect(
-        moveFile.execute({ source: "inside.txt", destination: "../../outside.txt" })
+        moveFile.execute({
+          source: "inside.txt",
+          destination: "../../outside.txt",
+        }),
       ).rejects.toThrow();
     });
   });
@@ -229,12 +249,14 @@ describe("FileManager MCP Server Tools", () => {
       const deleteResult = await deleteFile.execute({ path: filename });
       expect(deleteResult).toBe("File deleted successfully");
 
-      await expect(fs.access(path.join(SANDBOX_ROOT, filename))).rejects.toThrow();
+      await expect(
+        fs.access(path.join(SANDBOX_ROOT, filename)),
+      ).rejects.toThrow();
     });
 
     it("cannot delete outside sandbox", async () => {
       await expect(
-        deleteFile.execute({ path: "../../escape.txt" })
+        deleteFile.execute({ path: "../../escape.txt" }),
       ).rejects.toThrow();
     });
   });

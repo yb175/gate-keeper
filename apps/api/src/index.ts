@@ -1,8 +1,9 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { db } from "@repo/db";
 import { CreateUserSchema, formatDate, capitalize } from "@repo/shared";
+import crypto from "crypto";
+import { mcpDiscovery, mcpExecutor } from "../mcp/bootstrap.js";
 
 dotenv.config();
 
@@ -12,6 +13,15 @@ const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+interface User {
+  id: string;
+  email: string;
+  name?: string;
+  createdAt: Date;
+}
+
+const usersInMemory: User[] = [];
+
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: formatDate(new Date()) });
@@ -20,10 +30,10 @@ app.get("/health", (req, res) => {
 // Users listing route
 app.get("/users", async (req, res) => {
   try {
-    const users = await db.user.findMany({
-      orderBy: { createdAt: "desc" },
-    });
-    res.json(users);
+    const sortedUsers = [...usersInMemory].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+    res.json(sortedUsers);
   } catch (error) {
     console.error("Failed to fetch users:", error);
     res.status(500).json({ error: "Failed to fetch users" });
@@ -43,17 +53,50 @@ app.post("/users", async (req, res) => {
     const { email, name } = parseResult.data;
     const formattedName = name ? capitalize(name) : undefined;
 
-    const user = await db.user.create({
-      data: {
-        email,
-        name: formattedName,
-      },
-    });
+    const user: User = {
+      id: crypto.randomUUID(),
+      email,
+      name: formattedName,
+      createdAt: new Date(),
+    };
+    usersInMemory.push(user);
 
     res.status(201).json(user);
   } catch (error) {
     console.error("Failed to create user:", error);
     res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
+// MCP Discovery endpoint
+app.get("/mcp/tools", async (req, res) => {
+  try {
+    const forceRefresh = req.query.forceRefresh === "true";
+    const toolsMap = await mcpDiscovery.discoverTools(forceRefresh);
+    const toolsList = Array.from(toolsMap.entries()).map(([name, val]) => ({
+      name,
+      description: val.tool.description,
+      inputSchema: val.tool.inputSchema,
+      server: val.server.name,
+    }));
+    res.json({ tools: toolsList });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || String(error) });
+  }
+});
+
+// MCP Execute endpoint
+app.post("/mcp/execute", async (req, res) => {
+  try {
+    const { toolName, arguments: args, conversationId, decision } = req.body;
+    const result = await mcpExecutor.execute(toolName, args, {
+      conversationId,
+      timeoutMs: req.body.timeoutMs,
+      decision,
+    });
+    res.json({ result });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || String(error) });
   }
 });
 

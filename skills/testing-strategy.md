@@ -11,6 +11,7 @@ Whenever implementing or updating functionality, always propose and construct co
 ## Test Coverage Requirements
 
 Every test suite should cover the following areas where applicable:
+
 1. **Happy Path**: Successful executions with normal inputs.
 2. **Invalid Inputs**: Malformed, empty, or unexpected input payloads.
 3. **Dependency Failures**: Simulated third-party or subprocess crashes.
