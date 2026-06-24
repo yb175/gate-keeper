@@ -7,9 +7,73 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
+enum Decision {
+  ALLOW
+  DENY
+  PENDING
+  FAILED
+}
+
+model Log {
+  id         String   @id @default(uuid())
+
+  tool_name  String
+  decision   Decision
+
+  reason     String?
+
+  createdAt  DateTime @default(now())
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Approval {
+
+  id         String @id @default(uuid())
+
+  tool_name  String
+
+  arguments  Json
+
+  status     ApprovalStatus
+
+  createdAt  DateTime @default(now())
+
+  updatedAt  DateTime @updatedAt
+}
+
+enum PolicyAction {
+  ALLOW
+  APPROVAL
+  DENY
+}
+
+model Policy {
+
+  id            String @id @default(uuid())
+
+  tool_name     String @unique
+
+  action        PolicyAction
+
+  sandbox_path  String?
+
+  createdAt     DateTime @default(now())
+
+  updatedAt     DateTime @updatedAt
+}
+
+model Conversation {
+
+  id            String @id @default(uuid())
+
+  tokens_used   Int @default(0)
+
+  budget_limit  Int
+
+  createdAt     DateTime @default(now())
 }
