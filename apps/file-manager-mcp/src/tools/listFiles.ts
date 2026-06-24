@@ -3,7 +3,10 @@ import { SANDBOX_ROOT } from "../utils/sandbox.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 
-async function getFilesRecursively(dir: string, baseDir: string): Promise<string[]> {
+async function getFilesRecursively(
+  dir: string,
+  baseDir: string,
+): Promise<string[]> {
   let results: string[] = [];
   let list;
   try {
@@ -32,11 +35,11 @@ export const listFiles: Tool = {
   description: "List all files in the sandbox",
   inputSchema: {
     type: "object",
-    properties: {}
+    properties: {},
   },
   async execute(args: any): Promise<string[]> {
     await fs.mkdir(SANDBOX_ROOT, { recursive: true });
     const files = await getFilesRecursively(SANDBOX_ROOT, SANDBOX_ROOT);
     return files.sort();
-  }
+  },
 };

@@ -11,22 +11,31 @@ export const moveFile: Tool = {
     properties: {
       source: {
         type: "string",
-        description: "The path of the source file to move"
+        description: "The path of the source file to move",
       },
       destination: {
         type: "string",
-        description: "The destination path to move the file to"
-      }
+        description: "The destination path to move the file to",
+      },
     },
-    required: ["source", "destination"]
+    required: ["source", "destination"],
   },
-  async execute(args: { source: string; destination: string }): Promise<string> {
-    if (!args || typeof args.source !== "string" || typeof args.destination !== "string") {
-      throw new Error("Invalid arguments: 'source' and 'destination' must be strings");
+  async execute(args: {
+    source: string;
+    destination: string;
+  }): Promise<string> {
+    if (
+      !args ||
+      typeof args.source !== "string" ||
+      typeof args.destination !== "string"
+    ) {
+      throw new Error(
+        "Invalid arguments: 'source' and 'destination' must be strings",
+      );
     }
     const resolvedSource = validatePath(args.source);
     const resolvedDest = validatePath(args.destination);
-    
+
     try {
       await fs.access(resolvedDest);
       throw new Error(`Destination file '${args.destination}' already exists.`);
@@ -35,9 +44,9 @@ export const moveFile: Tool = {
         throw err;
       }
     }
-    
+
     await fs.mkdir(path.dirname(resolvedDest), { recursive: true });
     await fs.rename(resolvedSource, resolvedDest);
     return "File moved successfully";
-  }
+  },
 };

@@ -10,10 +10,10 @@ export const deleteFile: Tool = {
     properties: {
       path: {
         type: "string",
-        description: "The path of the file to delete"
-      }
+        description: "The path of the file to delete",
+      },
     },
-    required: ["path"]
+    required: ["path"],
   },
   async execute(args: { path: string }): Promise<string> {
     if (!args || typeof args.path !== "string") {
@@ -22,5 +22,5 @@ export const deleteFile: Tool = {
     const resolvedPath = validatePath(args.path);
     await fs.unlink(resolvedPath);
     return "File deleted successfully";
-  }
+  },
 };

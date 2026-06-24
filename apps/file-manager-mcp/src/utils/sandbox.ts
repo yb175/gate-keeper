@@ -11,7 +11,9 @@ export const REAL_SANDBOX_ROOT = (() => {
     return fs.realpathSync(SANDBOX_ROOT);
   }
   const parent = path.dirname(SANDBOX_ROOT);
-  const canonicalParent = fs.existsSync(parent) ? fs.realpathSync(parent) : parent;
+  const canonicalParent = fs.existsSync(parent)
+    ? fs.realpathSync(parent)
+    : parent;
   return path.resolve(canonicalParent, path.basename(SANDBOX_ROOT));
 })();
 
@@ -57,9 +59,10 @@ export function validatePath(filepath: string): string {
   const realAncestor = getRealPathSafe(resolved);
   const realRelative = path.relative(REAL_SANDBOX_ROOT, realAncestor);
   if (realRelative.startsWith("..") || path.isAbsolute(realRelative)) {
-    throw new Error(`Access denied: Path '${filepath}' resolves outside the sandbox.`);
+    throw new Error(
+      `Access denied: Path '${filepath}' resolves outside the sandbox.`,
+    );
   }
 
   return resolved;
 }
-

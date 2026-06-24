@@ -16,7 +16,7 @@ export const server = new Server(
     capabilities: {
       tools: {},
     },
-  }
+  },
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -34,10 +34,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   const tool = tools.find((t) => t.name === name);
   if (!tool) {
-    throw new McpError(
-      ErrorCode.MethodNotFound,
-      `Unknown tool: ${name}`
-    );
+    throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
   }
 
   try {
@@ -46,7 +43,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [
         {
           type: "text",
-          text: typeof result === "string" ? result : JSON.stringify(result, null, 2),
+          text:
+            typeof result === "string"
+              ? result
+              : JSON.stringify(result, null, 2),
         },
       ],
     };

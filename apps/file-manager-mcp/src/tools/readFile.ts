@@ -10,10 +10,10 @@ export const readFile: Tool = {
     properties: {
       path: {
         type: "string",
-        description: "The path of the file to read"
-      }
+        description: "The path of the file to read",
+      },
     },
-    required: ["path"]
+    required: ["path"],
   },
   async execute(args: { path: string }): Promise<string> {
     if (!args || typeof args.path !== "string") {
@@ -21,5 +21,5 @@ export const readFile: Tool = {
     }
     const resolvedPath = validatePath(args.path);
     return await fs.readFile(resolvedPath, "utf-8");
-  }
+  },
 };

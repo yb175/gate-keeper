@@ -16,6 +16,7 @@ When logging inside the codebase, always avoid using raw `console.log` statement
 ## Required Metadata Fields
 
 Ensure your log statements pass an object containing at least the following structured fields:
+
 - `tool_name`: The name of the MCP tool executing (if applicable).
 - `decision`: The policy decision (e.g. `ALLOW`, `DENY`, `APPROVAL`, etc.).
 - `conversation_id`: The ID of the current conversation.

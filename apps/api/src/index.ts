@@ -1,8 +1,9 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { db } from "@repo/db";
-import { CreateUserSchema, formatDate, capitalize } from "@repo/shared";
+import { formatDate } from "@repo/shared";
+import { mcpDiscovery, mcpExecutor } from "../mcp/bootstrap.js";
+import { AppError } from "../types.js";
 
 dotenv.config();
 
@@ -10,50 +11,59 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: formatDate(new Date()) });
 });
 
-// Users listing route
-app.get("/users", async (req, res) => {
+// MCP Discovery endpoint
+app.get("/mcp/tools", async (req, res) => {
   try {
-    const users = await db.user.findMany({
-      orderBy: { createdAt: "desc" },
-    });
-    res.json(users);
-  } catch (error) {
-    console.error("Failed to fetch users:", error);
-    res.status(500).json({ error: "Failed to fetch users" });
+    const forceRefresh = req.query.forceRefresh === "true";
+    const toolsMap = await mcpDiscovery.discoverTools(forceRefresh);
+    const toolsList = Array.from(toolsMap.entries()).map(([name, val]) => ({
+      name,
+      description: val.tool.description,
+      inputSchema: val.tool.inputSchema,
+      server: val.server.name,
+    }));
+    res.json({ tools: toolsList });
+  } catch (error: any) {
+    console.error("Failed to discover tools:", error);
+    res.status(500).json({ error: "Failed to discover tools" });
   }
 });
 
-// User creation route
-app.post("/users", async (req, res) => {
+// MCP Execute endpoint
+app.post("/mcp/execute", async (req, res) => {
   try {
-    // Validate request using shared Zod schema
-    const parseResult = CreateUserSchema.safeParse(req.body);
-    if (!parseResult.success) {
-      res.status(400).json({ error: parseResult.error.errors });
-      return;
+    const { toolName, arguments: args, conversationId, decision } = req.body;
+
+    // Sanitize timeoutMs parameter to prevent resource exhaustion / taint-flows
+    let timeoutMs: number | undefined = undefined;
+    if (req.body.timeoutMs !== undefined) {
+      const parsed = Number(req.body.timeoutMs);
+      if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 60000) {
+        timeoutMs = parsed;
+      }
     }
 
-    const { email, name } = parseResult.data;
-    const formattedName = name ? capitalize(name) : undefined;
-
-    const user = await db.user.create({
-      data: {
-        email,
-        name: formattedName,
-      },
+    const result = await mcpExecutor.execute(toolName, args, {
+      conversationId,
+      timeoutMs,
+      decision,
     });
+    res.json({ result });
+  } catch (error: any) {
+    console.error("Failed to execute tool:", error);
 
-    res.status(201).json(user);
-  } catch (error) {
-    console.error("Failed to create user:", error);
-    res.status(500).json({ error: "Failed to create user" });
+    if (error instanceof AppError) {
+      res.status(error.statusCode).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Failed to execute tool" });
+    }
   }
 });
 
