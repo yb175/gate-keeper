@@ -16,11 +16,14 @@ This Turborepo includes the following packages/apps:
 
 ### Apps and Packages
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- `apps/api`: Express API server managing MCP server registrations, tool executions, logging, and policy evaluations.
+- `apps/web`: Next.js web application interface.
+- `apps/file-manager-mcp`: Custom Model Context Protocol (MCP) server providing secure sandboxed filesystem operations.
+- `packages/db` ([@repo/db](./packages/db/README.md)): Prisma database library managing schemas, migrations, and SQLite instance. (See the [Schema Architecture Documentation](./packages/db/README.md)).
+- `packages/shared` ([@repo/shared](./packages/shared)): Shared utility functions and formatting helpers.
+- `packages/ui` ([@repo/ui](./packages/ui)): React UI components shared by the applications.
+- `packages/eslint-config` ([@repo/eslint-config](./packages/eslint-config)): Monorepo ESLint configurations.
+- `packages/typescript-config` ([@repo/typescript-config](./packages/typescript-config)): TSConfig setups.
 
 Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 

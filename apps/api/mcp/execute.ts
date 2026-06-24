@@ -46,7 +46,10 @@ export class ToolExecutor {
     }
 
     if (decision !== "ALLOW") {
-      const error = new AppError(403, `Tool execution rejected with decision: ${decision}`);
+      const error = new AppError(
+        403,
+        `Tool execution rejected with decision: ${decision}`,
+      );
       logger.error("Tool execution failed: Denied by policy", {
         tool_name: toolName,
         decision,

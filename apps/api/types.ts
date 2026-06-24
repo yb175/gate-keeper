@@ -29,4 +29,22 @@ export class AppError extends Error {
     }
   }
 }
+import { ApprovalStatus } from "@repo/db";
+export { ApprovalStatus };
 
+export interface ApprovalRequest {
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  status?: ApprovalStatus;
+  approvalId?: string;
+}
+export interface RuleResult<T> {
+  success: boolean;
+  result: T;
+  reason?: string;
+}
+
+export interface ConversationRequest {
+  conversationId: string;
+  token: number;
+}
