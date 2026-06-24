@@ -2,6 +2,8 @@ import needsApproval from "./rules/approval.js";
 import isblocked from "./rules/block.js";
 import budgetExceeded from "./rules/budget.js";
 import type { ApprovalRequest, ConversationRequest } from "../../types.js";
+import { db } from "@repo/db";
+import { logger } from "../../mcp/logger.js";
 
 export interface PolicyEngineResult {
   allowed: boolean;
@@ -13,11 +15,31 @@ export default async function PolicyEngine(
   context: ApprovalRequest,
   conversation: ConversationRequest,
 ): Promise<PolicyEngineResult> {
+  let policy;
+  try {
+    const tool_name = context.tool_name;
+
+    // Fetch the policy record once to prevent double lookup and TOCTOU race conditions
+    policy = await db.policy.findUnique({
+      where: { tool_name },
+    });
+  } catch (error: any) {
+    logger.error("Failed to query policy table in PolicyEngine pre-fetch", {
+      tool_name: context.tool_name,
+      error_message: error.message || String(error),
+    });
+    return {
+      allowed: false,
+      requiresApproval: false,
+      reason: "Failed to query policy table",
+    };
+  }
+
   try {
     const tool_name = context.tool_name;
 
     // 1. Block Check
-    const blockedResult = await isblocked(tool_name);
+    const blockedResult = await isblocked(tool_name, policy);
     if (!blockedResult.success) {
       return {
         allowed: false,
@@ -54,7 +76,7 @@ export default async function PolicyEngine(
     }
 
     // 3. Approval Check
-    const approvalResult = await needsApproval(tool_name);
+    const approvalResult = await needsApproval(tool_name, policy);
     if (!approvalResult.success) {
       return {
         allowed: false,

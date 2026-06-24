@@ -130,7 +130,7 @@ Tracks API usage tokens and enforces token budgets to prevent runaway loops or e
 
 ## Database Configuration
 
-The database configuration is managed inside [schema.prisma](file:///home/yb175/projects/gate-keeper/packages/db/prisma/schema.prisma):
+The database configuration is managed inside [schema.prisma](./prisma/schema.prisma):
 
 - **Provider**: SQLite (`sqlite`)
 - **Connection URL**: `file:./dev.db` (local development SQLite file inside the `prisma` directory)
@@ -146,7 +146,7 @@ To manage and inspect the database, run the following commands from the project 
 Generate the type-safe Prisma Client package:
 
 ```sh
-npm run build --filter=@repo/db
+npm run build -- --filter=@repo/db
 ```
 
 _Or directly within `/packages/db`:_

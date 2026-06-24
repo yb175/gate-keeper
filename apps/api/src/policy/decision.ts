@@ -55,6 +55,13 @@ export async function decide(
         };
       }
 
+      if (approval.tool_name !== context.tool_name) {
+        return {
+          decision: "DENY",
+          reason: "Approval tool name mismatch",
+        };
+      }
+
       switch (approval.status) {
         case ApprovalStatus.APPROVED:
           return {

@@ -1,5 +1,7 @@
 import { RuleResult } from "../../../types.js";
 import { db } from "@repo/db";
+import { logger } from "../../../mcp/logger.js";
+
 export default async function budgetExceeded(
   conversationId: string,
   token: number,
@@ -25,8 +27,12 @@ export default async function budgetExceeded(
       result: isExceeded,
       reason: isExceeded ? "Token budget exceeded" : undefined,
     };
-  } catch (error) {
-    console.error("db error:", error);
+  } catch (error: any) {
+    logger.error("Database query failed in budgetExceeded rule", {
+      conversation_id: conversationId,
+      token,
+      error_message: error.message || String(error),
+    });
     return {
       success: false,
       result: false,

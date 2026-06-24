@@ -19,11 +19,11 @@ This Turborepo includes the following packages/apps:
 - `apps/api`: Express API server managing MCP server registrations, tool executions, logging, and policy evaluations.
 - `apps/web`: Next.js web application interface.
 - `apps/file-manager-mcp`: Custom Model Context Protocol (MCP) server providing secure sandboxed filesystem operations.
-- `packages/db` ([@repo/db](file:///home/yb175/projects/gate-keeper/packages/db/README.md)): Prisma database library managing schemas, migrations, and SQLite instance. (See the [Schema Architecture Documentation](file:///home/yb175/projects/gate-keeper/packages/db/README.md)).
-- `packages/shared` ([@repo/shared](file:///home/yb175/projects/gate-keeper/packages/shared)): Shared utility functions and formatting helpers.
-- `packages/ui` ([@repo/ui](file:///home/yb175/projects/gate-keeper/packages/ui)): React UI components shared by the applications.
-- `packages/eslint-config` ([@repo/eslint-config](file:///home/yb175/projects/gate-keeper/packages/eslint-config)): Monorepo ESLint configurations.
-- `packages/typescript-config` ([@repo/typescript-config](file:///home/yb175/projects/gate-keeper/packages/typescript-config)): TSConfig setups.
+- `packages/db` ([@repo/db](./packages/db/README.md)): Prisma database library managing schemas, migrations, and SQLite instance. (See the [Schema Architecture Documentation](./packages/db/README.md)).
+- `packages/shared` ([@repo/shared](./packages/shared)): Shared utility functions and formatting helpers.
+- `packages/ui` ([@repo/ui](./packages/ui)): React UI components shared by the applications.
+- `packages/eslint-config` ([@repo/eslint-config](./packages/eslint-config)): Monorepo ESLint configurations.
+- `packages/typescript-config` ([@repo/typescript-config](./packages/typescript-config)): TSConfig setups.
 
 Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 

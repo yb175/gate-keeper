@@ -1,13 +1,20 @@
 import { RuleResult } from "../../../types.js";
 import { db, PolicyAction } from "@repo/db";
+import { logger } from "../../../mcp/logger.js";
+
 export default async function isblocked(
   tool_name: string,
+  preFetchedPolicy?: any,
 ): Promise<RuleResult<boolean>> {
   try {
-    const policy = await db.policy.findUnique({
-      where: { tool_name },
-    });
-    if (policy?.action == PolicyAction.DENY) {
+    const policy =
+      preFetchedPolicy !== undefined
+        ? preFetchedPolicy
+        : await db.policy.findUnique({
+            where: { tool_name },
+          });
+
+    if (policy?.action === PolicyAction.DENY) {
       return {
         success: true,
         result: true,
@@ -18,8 +25,11 @@ export default async function isblocked(
       success: true,
       result: false,
     };
-  } catch (error) {
-    console.error("db error:", error);
+  } catch (error: any) {
+    logger.error("Database query failed in isblocked rule", {
+      tool_name,
+      error_message: error.message || String(error),
+    });
 
     return {
       success: false,

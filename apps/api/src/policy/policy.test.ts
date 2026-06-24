@@ -281,7 +281,13 @@ describe("Decision Orchestration (decide)", () => {
 
     expect(res.decision).toBe("PENDING");
     expect(res.reason).toBe("generated-app-id");
-    expect(db.approval.create).toHaveBeenCalled();
+    expect(db.approval.create).toHaveBeenCalledWith({
+      data: {
+        tool_name: "test_tool",
+        arguments: {},
+        status: ApprovalStatus.PENDING,
+      },
+    });
   });
 
   it("should fetch approval state and return ALLOW if status is APPROVED", async () => {
@@ -314,6 +320,39 @@ describe("Decision Orchestration (decide)", () => {
     );
 
     expect(res.decision).toBe("ALLOW");
+  });
+
+  it("should return DENY when retrieved approval tool_name does not match the requesting tool_name", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "high_risk_tool",
+      action: PolicyAction.APPROVAL,
+      sandbox_path: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(db.conversation.findUnique).mockResolvedValue({
+      id: "conv-1",
+      tokens_used: 10,
+      budget_limit: 100,
+      createdAt: new Date(),
+    });
+    vi.mocked(db.approval.findUnique).mockResolvedValue({
+      id: "app-id-123",
+      tool_name: "low_risk_tool",
+      arguments: {},
+      status: ApprovalStatus.APPROVED,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await decide(
+      { tool_name: "high_risk_tool", arguments: {}, approvalId: "app-id-123" },
+      { conversationId: "conv-1", token: 5 },
+    );
+
+    expect(res.decision).toBe("DENY");
+    expect(res.reason).toBe("Approval tool name mismatch");
   });
 });
 

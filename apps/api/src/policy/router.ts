@@ -23,9 +23,14 @@ router.get(
   "/policies/:toolName",
   async (req: Request, res: Response): Promise<void> => {
     const { toolName } = req.params;
+    if (!toolName) {
+      res.status(400).json({ error: "Missing toolName parameter" });
+      return;
+    }
+    const normalizedToolName = toolName.trim();
     try {
       const policy = await db.policy.findUnique({
-        where: { tool_name: toolName },
+        where: { tool_name: normalizedToolName },
         select: {
           tool_name: true,
           action: true,
@@ -34,7 +39,7 @@ router.get(
 
       if (!policy) {
         res.json({
-          tool_name: toolName,
+          tool_name: normalizedToolName,
           action: "APPROVAL",
           implicit: true,
         });
@@ -57,6 +62,8 @@ router.post("/policies", async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
+  const normalizedToolName = tool_name.trim();
+
   if (
     !action ||
     !Object.values(PolicyAction).includes(action as PolicyAction)
@@ -69,7 +76,7 @@ router.post("/policies", async (req: Request, res: Response): Promise<void> => {
 
   try {
     const existing = await db.policy.findUnique({
-      where: { tool_name },
+      where: { tool_name: normalizedToolName },
     });
 
     if (existing) {
@@ -79,7 +86,7 @@ router.post("/policies", async (req: Request, res: Response): Promise<void> => {
 
     const created = await db.policy.create({
       data: {
-        tool_name,
+        tool_name: normalizedToolName,
         action: action as PolicyAction,
       },
       select: {
@@ -89,7 +96,11 @@ router.post("/policies", async (req: Request, res: Response): Promise<void> => {
     });
 
     res.status(201).json(created);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      res.status(409).json({ error: "Policy already exists" });
+      return;
+    }
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -99,7 +110,12 @@ router.patch(
   "/policies/:toolName",
   async (req: Request, res: Response): Promise<void> => {
     const { toolName } = req.params;
+    if (!toolName) {
+      res.status(400).json({ error: "Missing toolName parameter" });
+      return;
+    }
     const { action } = req.body;
+    const normalizedToolName = toolName.trim();
 
     if (
       !action ||
@@ -113,7 +129,7 @@ router.patch(
 
     try {
       const existing = await db.policy.findUnique({
-        where: { tool_name: toolName },
+        where: { tool_name: normalizedToolName },
       });
 
       if (!existing) {
@@ -122,7 +138,7 @@ router.patch(
       }
 
       const updated = await db.policy.update({
-        where: { tool_name: toolName },
+        where: { tool_name: normalizedToolName },
         data: {
           action: action as PolicyAction,
         },
@@ -144,9 +160,14 @@ router.delete(
   "/policies/:toolName",
   async (req: Request, res: Response): Promise<void> => {
     const { toolName } = req.params;
+    if (!toolName) {
+      res.status(400).json({ error: "Missing toolName parameter" });
+      return;
+    }
+    const normalizedToolName = toolName.trim();
     try {
       const existing = await db.policy.findUnique({
-        where: { tool_name: toolName },
+        where: { tool_name: normalizedToolName },
       });
 
       if (!existing) {
@@ -155,7 +176,7 @@ router.delete(
       }
 
       await db.policy.delete({
-        where: { tool_name: toolName },
+        where: { tool_name: normalizedToolName },
       });
 
       res.status(204).end();

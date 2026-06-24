@@ -29,11 +29,8 @@ export class AppError extends Error {
     }
   }
 }
-export enum ApprovalStatus {
-  PENDING = "PENDING",
-  APPROVED = "APPROVED",
-  REJECTED = "REJECTED",
-}
+import { ApprovalStatus } from "@repo/db";
+export { ApprovalStatus };
 
 export interface ApprovalRequest {
   tool_name: string;
