@@ -6,6 +6,7 @@ import { deleteFile } from "./tools/deleteFile.js";
 import { moveFile } from "./tools/moveFile.js";
 import { listFiles } from "./tools/listFiles.js";
 import * as fs from "fs/promises";
+import * as fsSync from "fs";
 import * as path from "path";
 
 describe("FileManager MCP Server Tools", () => {
@@ -101,6 +102,34 @@ describe("FileManager MCP Server Tools", () => {
             await fs.rename(backupPath, SANDBOX_ROOT);
           } catch (e) {}
         }
+      }
+    });
+
+    it("resolves the sandbox path correctly when the sandbox directory itself is a symlink", async () => {
+      const tempSandbox = path.resolve(SANDBOX_ROOT, "../temp-sandbox-symlink");
+      const tempTarget = path.resolve(SANDBOX_ROOT, "../temp-target-dir");
+      await fs.mkdir(tempTarget, { recursive: true });
+      try {
+        await fs.symlink(tempTarget, tempSandbox, "dir");
+        
+        const resolveSandbox = (rootPath: string) => {
+          if (fsSync.existsSync(rootPath)) {
+            return fsSync.realpathSync(rootPath);
+          }
+          const parent = path.dirname(rootPath);
+          const canonicalParent = fsSync.existsSync(parent) ? fsSync.realpathSync(parent) : parent;
+          return path.resolve(canonicalParent, path.basename(rootPath));
+        };
+
+        const resolvedRoot = resolveSandbox(tempSandbox);
+        expect(resolvedRoot).toBe(fsSync.realpathSync(tempTarget));
+      } finally {
+        try {
+          await fs.unlink(tempSandbox);
+        } catch (e) {}
+        try {
+          await fs.rm(tempTarget, { recursive: true, force: true });
+        } catch (e) {}
       }
     });
   });

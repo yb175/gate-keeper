@@ -7,6 +7,9 @@ const __dirname = path.dirname(__filename);
 
 export const SANDBOX_ROOT = path.resolve(__dirname, "../../sandbox");
 export const REAL_SANDBOX_ROOT = (() => {
+  if (fs.existsSync(SANDBOX_ROOT)) {
+    return fs.realpathSync(SANDBOX_ROOT);
+  }
   const parent = path.dirname(SANDBOX_ROOT);
   const canonicalParent = fs.existsSync(parent) ? fs.realpathSync(parent) : parent;
   return path.resolve(canonicalParent, path.basename(SANDBOX_ROOT));
