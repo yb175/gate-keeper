@@ -1,8 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { CreateUserSchema, formatDate, capitalize } from "@repo/shared";
-import crypto from "crypto";
+import { formatDate } from "@repo/shared";
 import { mcpDiscovery, mcpExecutor } from "../mcp/bootstrap.js";
 
 dotenv.config();
@@ -11,61 +10,11 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
-
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-  createdAt: Date;
-}
-
-const usersInMemory: User[] = [];
+app.use(express.json({ limit: "1mb" }));
 
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: formatDate(new Date()) });
-});
-
-// Users listing route
-app.get("/users", async (req, res) => {
-  try {
-    const sortedUsers = [...usersInMemory].sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-    );
-    res.json(sortedUsers);
-  } catch (error) {
-    console.error("Failed to fetch users:", error);
-    res.status(500).json({ error: "Failed to fetch users" });
-  }
-});
-
-// User creation route
-app.post("/users", async (req, res) => {
-  try {
-    // Validate request using shared Zod schema
-    const parseResult = CreateUserSchema.safeParse(req.body);
-    if (!parseResult.success) {
-      res.status(400).json({ error: parseResult.error.errors });
-      return;
-    }
-
-    const { email, name } = parseResult.data;
-    const formattedName = name ? capitalize(name) : undefined;
-
-    const user: User = {
-      id: crypto.randomUUID(),
-      email,
-      name: formattedName,
-      createdAt: new Date(),
-    };
-    usersInMemory.push(user);
-
-    res.status(201).json(user);
-  } catch (error) {
-    console.error("Failed to create user:", error);
-    res.status(500).json({ error: "Failed to create user" });
-  }
 });
 
 // MCP Discovery endpoint
@@ -81,7 +30,8 @@ app.get("/mcp/tools", async (req, res) => {
     }));
     res.json({ tools: toolsList });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || String(error) });
+    console.error("Failed to discover tools:", error);
+    res.status(500).json({ error: "Failed to discover tools" });
   }
 });
 
@@ -89,14 +39,33 @@ app.get("/mcp/tools", async (req, res) => {
 app.post("/mcp/execute", async (req, res) => {
   try {
     const { toolName, arguments: args, conversationId, decision } = req.body;
+
+    // Sanitize timeoutMs parameter to prevent resource exhaustion / taint-flows
+    let timeoutMs: number | undefined = undefined;
+    if (req.body.timeoutMs !== undefined) {
+      const parsed = Number(req.body.timeoutMs);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        timeoutMs = parsed;
+      }
+    }
+
     const result = await mcpExecutor.execute(toolName, args, {
       conversationId,
-      timeoutMs: req.body.timeoutMs,
+      timeoutMs,
       decision,
     });
     res.json({ result });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || String(error) });
+    const errMsg = error?.message || "";
+    console.error("Failed to execute tool:", error);
+
+    if (errMsg.includes("must be a") || errMsg.includes("cannot be empty")) {
+      res.status(400).json({ error: errMsg });
+    } else if (errMsg.includes("Tool not found")) {
+      res.status(404).json({ error: errMsg });
+    } else {
+      res.status(500).json({ error: "Failed to execute tool" });
+    }
   }
 });
 

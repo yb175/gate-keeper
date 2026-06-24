@@ -4,18 +4,20 @@ export class PluginRegistry {
   private plugins: MCPServer[] = [];
 
   registerPlugin(plugin: MCPServer): void {
-    if (!plugin.name.trim()) {
+    const trimmedName = plugin.name.trim();
+    if (!trimmedName) {
       throw new Error("Plugin name required");
     }
-    if (this.plugins.some((p) => p.name === plugin.name)) {
-      throw new Error(`${plugin.name} already registered`);
+    if (this.plugins.some((p) => p.name.trim() === trimmedName)) {
+      throw new Error(`${trimmedName} already registered`);
     }
 
     this.plugins.push(plugin);
   }
 
   unregisterPlugin(name: string): void {
-    this.plugins = this.plugins.filter((p) => p.name !== name);
+    const trimmedName = name.trim();
+    this.plugins = this.plugins.filter((p) => p.name.trim() !== trimmedName);
   }
 
   getPlugins(): MCPServer[] {

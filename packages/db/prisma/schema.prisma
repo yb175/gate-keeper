@@ -68,7 +68,6 @@ model Policy {
 }
 
 model Conversation {
-
   id            String @id @default(uuid())
 
   tokens_used   Int @default(0)

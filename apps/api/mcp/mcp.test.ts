@@ -95,6 +95,15 @@ describe("MCP Production-Ready Module", () => {
       registry.unregisterPlugin("server1");
       expect(registry.getPlugins()).toHaveLength(0);
     });
+
+    it("should normalize duplicate plugin name checks with whitespace", () => {
+      const plugin1 = new MockMCPServer("  server1  ");
+      const plugin2 = new MockMCPServer("server1");
+      registry.registerPlugin(plugin1);
+      expect(() => registry.registerPlugin(plugin2)).toThrow(
+        "server1 already registered",
+      );
+    });
   });
 
   describe("ToolsDiscovery Caching & Errors", () => {
@@ -186,6 +195,39 @@ describe("MCP Production-Ready Module", () => {
         "Failed to discover tools from serverBad",
       );
     });
+
+    it("should not poison discovery cache on a rejected promise", async () => {
+      const mockTool1: Tool = {
+        name: "dup",
+        description: "d",
+        inputSchema: {},
+        execute: async () => {},
+      };
+      const mockTool2: Tool = {
+        name: "dup",
+        description: "d",
+        inputSchema: {},
+        execute: async () => {},
+      };
+
+      const plugin1 = new MockMCPServer("server1", [mockTool1]);
+      const plugin2 = new MockMCPServer("server2", [mockTool2]);
+
+      registry.registerPlugin(plugin1);
+      registry.registerPlugin(plugin2);
+
+      // First discovery call fails due to conflict and rejects
+      await expect(discovery.discoverTools()).rejects.toThrow(
+        "already registered",
+      );
+
+      // Resolve the issue by unregistering the conflict server
+      registry.unregisterPlugin("server2");
+
+      // Second call should succeed because the rejected promise cache was cleared
+      const result = await discovery.discoverTools();
+      expect(result.has("dup")).toBe(true);
+    });
   });
 
   describe("ToolExecutor Execution & Safeness", () => {
@@ -256,6 +298,34 @@ describe("MCP Production-Ready Module", () => {
       expect(errLog).toBeDefined();
       expect(errLog.tool_name).toBe("slowTool");
       expect(errLog.error_message).toBe("Execution timed out after 10ms");
+    });
+
+    it("should handle non-string toolName validation without throwing TypeError", async () => {
+      await expect(executor.execute(123 as any, {})).rejects.toThrow(
+        "must be a non-empty string",
+      );
+      await expect(executor.execute(null as any, {})).rejects.toThrow(
+        "must be a non-empty string",
+      );
+
+      const errLog = loggedItems.find(
+        (log) => log.level === "error" && log.tool_name === "invalid_type",
+      );
+      expect(errLog).toBeDefined();
+    });
+  });
+
+  describe("StdioMCPServer listTools recovery", () => {
+    it("should reset client transport state on listTools failure", async () => {
+      const server = new StdioMCPServer("dead-server", "node", [
+        "non-existent-script.js",
+      ]);
+      const closeSpy = vi.spyOn(server, "close");
+
+      await expect(server.listTools()).rejects.toThrow();
+      expect(closeSpy).toHaveBeenCalled();
+
+      closeSpy.mockRestore();
     });
   });
 

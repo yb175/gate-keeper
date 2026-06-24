@@ -20,10 +20,22 @@ export class ToolExecutor {
     const decision = options?.decision ?? "ALLOW";
 
     // 1. Input Validation
-    if (!toolName || !toolName.trim()) {
+    if (typeof toolName !== "string") {
+      const error = new Error("Tool name must be a non-empty string");
+      logger.error("Tool execution failed: Invalid input", {
+        tool_name: "invalid_type",
+        decision: "DENY",
+        conversation_id: conversationId,
+        duration_ms: 0,
+        error_message: error.message,
+      });
+      throw error;
+    }
+
+    if (!toolName.trim()) {
       const error = new Error("Tool name cannot be empty");
       logger.error("Tool execution failed: Invalid input", {
-        tool_name: toolName || "empty",
+        tool_name: "empty",
         decision: "DENY",
         conversation_id: conversationId,
         duration_ms: 0,
@@ -42,7 +54,21 @@ export class ToolExecutor {
       }
 
       // 3. Execution Timeout Safeness
-      const timeout = options?.timeoutMs ?? 10000;
+      let timeout = options?.timeoutMs ?? 10000;
+
+      const MAX_TIMEOUT_MS = 60000; // 60 seconds max
+      const MIN_TIMEOUT_MS = 1; // 1 ms min
+
+      if (
+        typeof timeout !== "number" ||
+        Number.isNaN(timeout) ||
+        timeout < MIN_TIMEOUT_MS
+      ) {
+        timeout = 10000;
+      } else if (timeout > MAX_TIMEOUT_MS) {
+        timeout = MAX_TIMEOUT_MS;
+      }
+
       let timerId: NodeJS.Timeout | undefined;
 
       const timeoutPromise = new Promise<never>((_, reject) => {

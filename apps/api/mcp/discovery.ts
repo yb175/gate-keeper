@@ -16,7 +16,10 @@ export class ToolsDiscovery {
     forceRefresh = false,
   ): Promise<Map<string, DiscoveredTool>> {
     if (forceRefresh || !this.discoveryPromise) {
-      this.discoveryPromise = this.performDiscovery();
+      this.discoveryPromise = this.performDiscovery().catch((error) => {
+        this.discoveryPromise = null;
+        throw error;
+      });
     }
     return this.discoveryPromise;
   }

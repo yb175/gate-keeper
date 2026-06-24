@@ -72,17 +72,22 @@ export class StdioMCPServer implements MCPServer {
   }
 
   async listTools(): Promise<Tool[]> {
-    const client = await this.getConnectedClient();
-    const response = await client.listTools();
+    try {
+      const client = await this.getConnectedClient();
+      const response = await client.listTools();
 
-    return (response.tools || []).map((t) => ({
-      name: t.name,
-      description: t.description || "",
-      inputSchema: t.inputSchema || {},
-      execute: async (args: unknown) => {
-        return this.execute(t.name, args);
-      },
-    }));
+      return (response.tools || []).map((t) => ({
+        name: t.name,
+        description: t.description || "",
+        inputSchema: t.inputSchema || {},
+        execute: async (args: unknown) => {
+          return this.execute(t.name, args);
+        },
+      }));
+    } catch (error) {
+      await this.close();
+      throw error;
+    }
   }
 
   async execute(toolName: string, args: unknown): Promise<unknown> {
