@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { formatDate } from "@repo/shared";
 import { mcpDiscovery, mcpExecutor } from "../mcp/bootstrap.js";
+import { AppError } from "../types.js";
 
 dotenv.config();
 
@@ -56,15 +57,10 @@ app.post("/mcp/execute", async (req, res) => {
     });
     res.json({ result });
   } catch (error: any) {
-    const errMsg = error?.message || "";
     console.error("Failed to execute tool:", error);
 
-    if (errMsg.includes("must be a") || errMsg.includes("cannot be empty")) {
-      res.status(400).json({ error: errMsg });
-    } else if (errMsg.includes("Tool not found")) {
-      res.status(404).json({ error: errMsg });
-    } else if (errMsg.includes("rejected with decision")) {
-      res.status(403).json({ error: errMsg });
+    if (error instanceof AppError) {
+      res.status(error.statusCode).json({ error: error.message });
     } else {
       res.status(500).json({ error: "Failed to execute tool" });
     }

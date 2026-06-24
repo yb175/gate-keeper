@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { PluginRegistry } from "./registry.js";
 import { ToolsDiscovery } from "./discovery.js";
 import { ToolExecutor } from "./execute.js";
-import { MCPServer, Tool } from "../types.js";
+import { MCPServer, Tool, AppError } from "../types.js";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -325,6 +325,51 @@ describe("MCP Production-Ready Module", () => {
       expect(errLog).toBeDefined();
       expect(errLog.message).toBe("Tool execution failed: Denied by policy");
       expect(errLog.decision).toBe("DENY");
+    });
+
+    it("should throw structured AppError with correct status codes", async () => {
+      // 1. Tool name must be a non-empty string -> 400
+      try {
+        await executor.execute(123 as any, {});
+        expect.fail("Should have thrown");
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(AppError);
+        expect(err.statusCode).toBe(400);
+      }
+
+      // 2. Tool name cannot be empty -> 400
+      try {
+        await executor.execute("   ", {});
+        expect.fail("Should have thrown");
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(AppError);
+        expect(err.statusCode).toBe(400);
+      }
+
+      // 3. Tool execution rejected with decision: DENY -> 403
+      const mockTool: Tool = {
+        name: "mathAdd",
+        description: "add two numbers",
+        inputSchema: {},
+        execute: async (args: any) => args.a + args.b,
+      };
+      registry.registerPlugin(new MockMCPServer("mathServer", [mockTool]));
+      try {
+        await executor.execute("mathAdd", { a: 2, b: 3 }, { decision: "DENY" });
+        expect.fail("Should have thrown");
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(AppError);
+        expect(err.statusCode).toBe(403);
+      }
+
+      // 4. Tool not found -> 404
+      try {
+        await executor.execute("missingTool", {});
+        expect.fail("Should have thrown");
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(AppError);
+        expect(err.statusCode).toBe(404);
+      }
     });
 
     it("should throw an error for empty tool name", async () => {

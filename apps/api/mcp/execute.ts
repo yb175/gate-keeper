@@ -1,5 +1,6 @@
 import { ToolsDiscovery } from "./discovery.js";
 import { logger } from "./logger.js";
+import { AppError } from "../types.js";
 
 export interface ExecuteOptions {
   conversationId?: string;
@@ -21,7 +22,7 @@ export class ToolExecutor {
 
     // 1. Input Validation
     if (typeof toolName !== "string") {
-      const error = new Error("Tool name must be a non-empty string");
+      const error = new AppError(400, "Tool name must be a non-empty string");
       logger.error("Tool execution failed: Invalid input", {
         tool_name: "invalid_type",
         decision: "DENY",
@@ -33,7 +34,7 @@ export class ToolExecutor {
     }
 
     if (!toolName.trim()) {
-      const error = new Error("Tool name cannot be empty");
+      const error = new AppError(400, "Tool name cannot be empty");
       logger.error("Tool execution failed: Invalid input", {
         tool_name: "empty",
         decision: "DENY",
@@ -45,7 +46,7 @@ export class ToolExecutor {
     }
 
     if (decision !== "ALLOW") {
-      const error = new Error(`Tool execution rejected with decision: ${decision}`);
+      const error = new AppError(403, `Tool execution rejected with decision: ${decision}`);
       logger.error("Tool execution failed: Denied by policy", {
         tool_name: toolName,
         decision,
@@ -62,7 +63,7 @@ export class ToolExecutor {
       const discoveredTool = discovered.get(toolName);
 
       if (!discoveredTool) {
-        throw new Error(`Tool not found: ${toolName}`);
+        throw new AppError(404, `Tool not found: ${toolName}`);
       }
 
       // 3. Execution Timeout Safeness
