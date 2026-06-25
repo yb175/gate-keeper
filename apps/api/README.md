@@ -133,25 +133,3 @@ Client Application             loop.ts                  SQLite DB          Admin
 * **Timeout limits on model requests**: We wrap connections to the model API in an `AbortSignal.timeout(timeoutMs)`. If the upstream service freezes or runs slow, the connection terminates cleanly instead of stalling your server thread. The timeout duration is safely parsed and falls back to 30 seconds if config variables are invalid.
 
 ---
-
-## Common questions
-
-### Why separate policy and decision logic?
-
-The policy engine in [engine.ts](file:///home/yb175/projects/gate-keeper/apps/api/src/policy/engine.ts) handles static checks, such as budget limits or blocked lists. The decision engine in [decision.ts](file:///home/yb175/projects/gate-keeper/apps/api/src/policy/decision.ts) handles dynamic, stateful workflows, such as checking and updating database approval records. Keeping them separate makes safety boundaries easier to verify and modify without breaking approval flows.
-
-### Why use a unique approval ID instead of checking the tool name?
-
-Looking up approval rows by tool name is vulnerable to replay attacks. A previously approved record for a tool could be reused to authorize a new tool execution. By checking the unique `approvalId`, we make sure each human approval authorizes exactly one execution.
-
-### How do policy changes affect running agents?
-
-The orchestration loop queries policy rules from the database at the start of every step. Since we do not cache policy states in memory, any rules updated by administrators apply immediately to active agents. You do not need to restart the server or configure WebSockets to push updates.
-
-### How do you prevent prompt injection from bypassing rules?
-
-The language model cannot call tools directly. It can only output a request payload proposing a tool call. The execution loop in [loop.ts](file:///home/yb175/projects/gate-keeper/apps/api/src/agent/loop.ts) intercepts this proposal and runs it through the policy engine before any tool runs. Even if a prompt instructs the model to ignore rules, the server-side check blocks unauthorized execution.
-
-### What happens when the human reviewer is offline?
-
-The orchestrator logs the pending execution arguments to the database, pauses the execution loop, and returns a `PENDING` status along with the `approvalId`. The server yields the thread immediately. Your client application can poll the status endpoint or resume the request later when the reviewer has approved it.
