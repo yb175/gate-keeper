@@ -20,10 +20,18 @@ export default function LogsPage() {
   };
 
   useEffect(() => {
-    fetchLogsData();
-    // Poll for new logs every 5 seconds
-    const interval = setInterval(fetchLogsData, 5000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+
+    const poll = async () => {
+      await fetchLogsData();
+      if (!cancelled) {
+        // Only schedule the next fetch after the previous one completes
+        setTimeout(poll, 5000);
+      }
+    };
+
+    poll();
+    return () => { cancelled = true; };
   }, []);
 
   const handleResetLogs = async () => {

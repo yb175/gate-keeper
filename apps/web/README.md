@@ -12,7 +12,7 @@ We believe developer tools should look as premium as consumer applications. The 
 
 * **The "Off-Black" Workspace**: Built with a dark, curated color scheme using deep charcoal tones (`zinc-950` backgrounds, `zinc-900` cards, and low-contrast `zinc-800` borders). This keeps it easy on the eyes during long debugging sessions.
 * **Micro-Animations & Visual Cues**: When a tool is intercepted and requires human review, the UI draws attention through subtle animations (like soft pulsing amber rings) to flag execution blocks.
-* **Shimmer Skeletons over Raw Loading Spinners**: Nobody likes jarring layout shifts or simple text placeholders. Every table component (Policies, Approvals, Logs) uses a CSS-gradient shimmer effect (`.shimmer` animation in [globals.css](file:///home/yb175/projects/gate-keeper/apps/web/app/globals.css)) that mimics the final grid structure while data is being loaded.
+* **Shimmer Skeletons over Raw Loading Spinners**: Nobody likes jarring layout shifts or simple text placeholders. Every table component (Policies, Approvals, Logs) uses a CSS-gradient shimmer effect (`.shimmer` animation in [globals.css](app/globals.css)) that mimics the final grid structure while data is being loaded.
 * **Utilitarian Typography**: The layout pairs clean, legible body text with monospaced accents (`Geist Mono`) for JSON representations, arguments, and tool names, emphasizing its nature as an operator's terminal.
 
 ---
@@ -70,7 +70,7 @@ Because Next.js pre-renders pages on the server (which doesn't have access to br
 
 To prevent this:
 1. The slice starts with a safe, default initial state.
-2. The page layout mounts a client-side layout hook that dispatches the `hydrateChatState` action on mount.
+2. The chat page mounts a hook that dispatches the `hydrateChatState` action on mount.
 3. This syncs `localStorage` variables back into the Redux store on the client, ensuring server-to-client rendering transitions are completely smooth.
 
 ---

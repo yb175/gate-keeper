@@ -21,64 +21,72 @@ export default function PolicyTable({
   onDeletePolicy,
   loading,
 }: PolicyTableProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [editingPolicy, setEditingPolicy] = useState<Policy | null>(null);
-  const [toolName, setToolName] = useState("");
-  const [action, setAction] = useState<PolicyAction>("APPROVAL");
+  const [editingToolName, setEditingToolName] = useState<string | null>(null);
+  const [editingAction, setEditingAction] = useState<PolicyAction>("APPROVAL");
+  const [isAddingInline, setIsAddingInline] = useState(false);
+  const [newToolName, setNewToolName] = useState("");
+  const [newAction, setNewAction] = useState<PolicyAction>("APPROVAL");
   const [actionLoading, setActionLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-
+ 
   const handleOpenAdd = () => {
-    setEditingPolicy(null);
-    setToolName(mcpTools.length > 0 ? (mcpTools[0]?.name ?? "") : "");
-    setAction("APPROVAL");
+    const availableTools = mcpTools.filter(t => !policies.some(p => p.tool_name === t.name));
+    setNewToolName(availableTools[0]?.name || "");
+    setNewAction("APPROVAL");
     setErrorMsg("");
-    setIsOpen(true);
+    setIsAddingInline(true);
+    setEditingToolName(null);
   };
-
-  const handleOpenEdit = (policy: Policy) => {
-    setEditingPolicy(policy);
-    setToolName(policy.tool_name);
-    setAction(policy.action);
+ 
+  const handleStartEdit = (policy: Policy) => {
+    setEditingToolName(policy.tool_name);
+    setEditingAction(policy.action);
     setErrorMsg("");
-    setIsOpen(true);
+    setIsAddingInline(false);
   };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!toolName.trim()) {
+ 
+  const handleSaveEdit = async (toolName: string) => {
+    setErrorMsg("");
+    setActionLoading(true);
+    try {
+      await onUpdatePolicy(toolName, editingAction);
+      setEditingToolName(null);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || "Failed to update policy.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+ 
+  const handleSaveNew = async () => {
+    if (!newToolName) {
       setErrorMsg("Tool name is required");
       return;
     }
     setErrorMsg("");
     setActionLoading(true);
     try {
-      if (editingPolicy) {
-        await onUpdatePolicy(toolName, action);
-      } else {
-        // Check if policy already exists
-        const exists = policies.some((p) => p.tool_name.toLowerCase() === toolName.trim().toLowerCase());
-        if (exists) {
-          setErrorMsg("A policy already exists for this tool name.");
-          setActionLoading(false);
-          return;
-        }
-        await onAddPolicy(toolName.trim(), action);
+      const exists = policies.some((p) => p.tool_name.toLowerCase() === newToolName.trim().toLowerCase());
+      if (exists) {
+        setErrorMsg("A policy already exists for this tool name.");
+        setActionLoading(false);
+        return;
       }
-      setIsOpen(false);
+      await onAddPolicy(newToolName, newAction);
+      setIsAddingInline(false);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || "Failed to save policy.");
+      setErrorMsg(err.response?.data?.error || "Failed to add policy.");
     } finally {
       setActionLoading(false);
     }
   };
-
+ 
   const handleDelete = async (toolName: string) => {
     if (confirm(`Are you sure you want to delete the policy for ${toolName}?`)) {
       try {
         await onDeletePolicy(toolName);
       } catch (err) {
-        alert("Failed to delete policy");
+        setErrorMsg("Failed to delete policy");
       }
     }
   };
@@ -99,7 +107,17 @@ export default function PolicyTable({
           <span>Add Policy</span>
         </button>
       </div>
-
+ 
+      {errorMsg && (
+        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-sm text-red-400 font-mono text-xs flex items-center justify-between animate-fadeIn">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg("")} className="text-red-500 hover:text-red-400 font-bold font-mono">✕</button>
+        </div>
+      )}
+ 
       {/* Table */}
       <div className="border border-zinc-800 bg-zinc-950 rounded-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -112,6 +130,55 @@ export default function PolicyTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-900 font-mono text-xs">
+              {/* Inline Add Row */}
+              {isAddingInline && (
+                <tr className="bg-zinc-900/50 border-b border-zinc-900">
+                  <td className="px-4 py-2">
+                    {mcpTools.filter(t => !policies.some(p => p.tool_name === t.name)).length === 0 ? (
+                      <span className="text-zinc-500 font-mono text-xs italic">All tools configured</span>
+                    ) : (
+                      <select
+                        value={newToolName}
+                        onChange={(e) => setNewToolName(e.target.value)}
+                        className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono rounded-sm text-xs focus:outline-none focus:border-zinc-500"
+                      >
+                        {mcpTools.filter(t => !policies.some(p => p.tool_name === t.name)).map((t) => (
+                          <option key={t.name} value={t.name}>{t.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={newAction}
+                      onChange={(e) => setNewAction(e.target.value as PolicyAction)}
+                      className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono rounded-sm text-xs focus:outline-none focus:border-zinc-500"
+                    >
+                      <option value="ALLOW">ALLOW</option>
+                      <option value="APPROVAL">APPROVAL</option>
+                      <option value="DENY">DENY</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <div className="flex items-center justify-end space-x-2">
+                      <button
+                        onClick={handleSaveNew}
+                        disabled={actionLoading || mcpTools.filter(t => !policies.some(p => p.tool_name === t.name)).length === 0}
+                        className="px-2.5 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-mono text-2xs rounded-sm transition-colors duration-150"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setIsAddingInline(false)}
+                        className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 font-mono text-2xs rounded-sm transition-colors duration-150"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+ 
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} className="border-b border-zinc-900/50">
@@ -129,144 +196,87 @@ export default function PolicyTable({
                     </td>
                   </tr>
                 ))
-              ) : policies.length === 0 ? (
+              ) : policies.length === 0 && !isAddingInline ? (
                 <tr>
                   <td colSpan={3} className="px-4 py-8 text-center text-zinc-500">
                     No policies defined. All tools default to APPROVAL.
                   </td>
                 </tr>
               ) : (
-                policies.map((policy) => (
-                  <tr key={policy.tool_name} className="hover:bg-zinc-900/30 transition-colors">
-                    <td className="px-4 py-3 font-semibold text-zinc-200">{policy.tool_name}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold ${
-                          policy.action === "ALLOW"
-                            ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                            : policy.action === "DENY"
-                            ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                            : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                        }`}
-                      >
-                        {policy.action}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end space-x-3">
-                        <button
-                          onClick={() => handleOpenEdit(policy)}
-                          className="text-zinc-400 hover:text-zinc-100 flex items-center space-x-1"
-                        >
-                          <Edit2 className="h-3 w-3" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(policy.tool_name)}
-                          className="text-zinc-600 hover:text-red-400 flex items-center space-x-1"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          <span>Delete</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                policies.map((policy) => {
+                  const isEditing = editingToolName === policy.tool_name;
+                  return (
+                    <tr key={policy.tool_name} className="hover:bg-zinc-900/30 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-zinc-200">{policy.tool_name}</td>
+                      <td className="px-4 py-3">
+                        {isEditing ? (
+                          <select
+                            value={editingAction}
+                            onChange={(e) => setEditingAction(e.target.value as PolicyAction)}
+                            className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono rounded-sm text-xs focus:outline-none focus:border-zinc-500"
+                          >
+                            <option value="ALLOW">ALLOW</option>
+                            <option value="APPROVAL">APPROVAL</option>
+                            <option value="DENY">DENY</option>
+                          </select>
+                        ) : (
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold ${
+                              policy.action === "ALLOW"
+                                ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                                : policy.action === "DENY"
+                                ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            }`}
+                          >
+                            {policy.action}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {isEditing ? (
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => handleSaveEdit(policy.tool_name)}
+                              disabled={actionLoading}
+                              className="px-2.5 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-mono text-2xs rounded-sm transition-colors duration-150"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingToolName(null)}
+                              className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 font-mono text-2xs rounded-sm transition-colors duration-150"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end space-x-3">
+                            <button
+                              onClick={() => handleStartEdit(policy)}
+                              className="text-zinc-400 hover:text-zinc-100 flex items-center space-x-1"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleDelete(policy.tool_name)}
+                              className="text-zinc-600 hover:text-red-400 flex items-center space-x-1"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
-
-      {/* Modal Dialog */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md border border-zinc-800 bg-zinc-950 rounded-sm overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="border-b border-zinc-800 bg-zinc-900/50 px-4 py-3 flex items-center justify-between">
-              <span className="font-mono font-bold text-xs text-white">
-                {editingPolicy ? "EDIT POLICY" : "CREATE NEW POLICY"}
-              </span>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="text-zinc-500 hover:text-zinc-300 font-mono text-xs"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSave} className="p-4 space-y-4">
-              {errorMsg && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-sm text-red-400 font-mono text-2xs flex items-start space-x-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label className="font-mono text-3xs text-zinc-500 uppercase block">Tool Name</label>
-                {editingPolicy ? (
-                  <input
-                    type="text"
-                    disabled
-                    value={toolName}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono rounded-sm text-sm focus:outline-none opacity-60"
-                  />
-                ) : (
-                  <select
-                    value={toolName}
-                    onChange={(e) => setToolName(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono rounded-sm text-sm focus:outline-none focus:border-zinc-500"
-                  >
-                    {mcpTools.length === 0 ? (
-                      <option value="">No tools discovered</option>
-                    ) : (
-                      mcpTools.map((tool) => (
-                        <option key={tool.name} value={tool.name}>
-                          {tool.name} ({tool.server})
-                        </option>
-                      ))
-                    )}
-                  </select>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-mono text-3xs text-zinc-500 uppercase block">Action</label>
-                <select
-                  value={action}
-                  onChange={(e) => setAction(e.target.value as PolicyAction)}
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono rounded-sm text-sm focus:outline-none focus:border-zinc-500"
-                >
-                  <option value="ALLOW">ALLOW (Auto execute)</option>
-                  <option value="APPROVAL">APPROVAL (Require manual review)</option>
-                  <option value="DENY">DENY (Block completely)</option>
-                </select>
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-zinc-900">
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 font-mono text-xs rounded-sm transition-colors duration-150"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading || (!editingPolicy && !toolName)}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 disabled:opacity-50 text-zinc-900 font-mono text-xs font-bold rounded-sm transition-colors duration-150"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  <span>{actionLoading ? "Saving..." : "Save Policy"}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

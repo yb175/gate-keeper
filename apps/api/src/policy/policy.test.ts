@@ -833,36 +833,38 @@ describe("Policy Engine REST Endpoints", () => {
       const res = mockResponse();
 
       await getApprovals(req, res, () => {});
-
-      expect(db.approval.findMany).toHaveBeenCalledWith({
-        orderBy: { createdAt: "desc" }
-      });
-      expect(res.json).toHaveBeenCalledWith([
-        { id: "app-123", tool_name: "test_tool", status: "PENDING" }
-      ]);
-    });
-  });
-
-  describe("GET /logs", () => {
-    it("should return a list of decision logs", async () => {
-      const getLogs = getHandler("/logs", "GET");
-      expect(getLogs).toBeDefined();
-
-      vi.mocked(db.log.findMany).mockResolvedValue([
-        { id: "log-123", tool_name: "test_tool", decision: "ALLOW" }
-      ] as any);
-
-      const req = {} as Request;
-      const res = mockResponse();
-
-      await getLogs(req, res, () => {});
-
-      expect(db.log.findMany).toHaveBeenCalledWith({
-        orderBy: { createdAt: "desc" }
-      });
-      expect(res.json).toHaveBeenCalledWith([
-        { id: "log-123", tool_name: "test_tool", decision: "ALLOW" }
-      ]);
+ 
+       expect(db.approval.findMany).toHaveBeenCalledWith({
+         orderBy: { createdAt: "desc" },
+         take: 100
+       });
+       expect(res.json).toHaveBeenCalledWith([
+         { id: "app-123", tool_name: "test_tool", status: "PENDING" }
+       ]);
+     });
+   });
+ 
+   describe("GET /logs", () => {
+     it("should return a list of decision logs", async () => {
+       const getLogs = getHandler("/logs", "GET");
+       expect(getLogs).toBeDefined();
+ 
+       vi.mocked(db.log.findMany).mockResolvedValue([
+         { id: "log-123", tool_name: "test_tool", decision: "ALLOW" }
+       ] as any);
+ 
+       const req = {} as Request;
+       const res = mockResponse();
+ 
+       await getLogs(req, res, () => {});
+ 
+       expect(db.log.findMany).toHaveBeenCalledWith({
+         orderBy: { createdAt: "desc" },
+         take: 100
+       });
+       expect(res.json).toHaveBeenCalledWith([
+         { id: "log-123", tool_name: "test_tool", decision: "ALLOW" }
+       ]);
     });
   });
 

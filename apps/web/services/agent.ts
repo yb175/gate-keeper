@@ -1,7 +1,16 @@
 import axios from "axios";
 
-const API_PORT = process.env.API_PORT || "3001";
-const API_URL = `http://localhost:${API_PORT}`;
+const getApiUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  const port = process.env.NEXT_PUBLIC_API_PORT || "3001";
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:${port}`;
+  }
+  return `http://localhost:${port}`;
+};
+const API_URL = getApiUrl();
 
 export interface ChatMessage {
   role: "user" | "assistant" | "tool";
@@ -9,7 +18,7 @@ export interface ChatMessage {
 }
 
 export interface AgentRunResponse {
-  status: "SUCCESS" | "PENDING" | "DENIED" | "ERROR";
+  status: "SUCCESS" | "PENDING" | "DENY";
   answer?: string;
   approvalId?: string;
   reason?: string;

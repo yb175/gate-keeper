@@ -18,6 +18,18 @@ export async function decide(
     if (context.tool_name === "multiple_tool_calls") {
       const toolCalls = (context.arguments as any)?.tool_calls;
       if (!Array.isArray(toolCalls)) {
+        // Audit the denial so this rejection path is never invisible
+        try {
+          await db.log.create({
+            data: {
+              tool_name: "multiple_tool_calls",
+              decision: "DENY",
+              reason: `Conversation: ${conversation.conversationId} | Invalid parallel tool_calls argument structure`,
+            },
+          });
+        } catch (logErr) {
+          console.error("Failed to write denial log for invalid parallel args:", logErr);
+        }
         return {
           decision: "DENY",
           reason: "Invalid parallel tool calls arguments structure",
@@ -64,10 +76,22 @@ export async function decide(
               await db.approval.delete({
                 where: { id: approval.id },
               });
-            } catch (err) {
-              // Ignore if already deleted (idempotency safety)
+            } catch (err: any) {
+              // Only ignore "record not found" errors (concurrent resume by poller + manual click).
+              // Any other delete failure is unexpected — log DENY and abort to preserve
+              // single-use protection: if we cannot confirm deletion we must not allow.
+              if (err?.code !== "P2025") {
+                await db.log.create({
+                  data: {
+                    tool_name: "multiple_tool_calls",
+                    decision: "DENY",
+                    reason: `Conversation: ${conversation.conversationId} | Could not delete approval record, aborting to prevent replay (ID: ${approval.id})`,
+                  },
+                });
+                return { decision: "DENY", reason: "Approval record deletion failed" };
+              }
             }
-            // Log ALLOW for each individual tool call
+            // Log ALLOW for each individual tool call only after confirmed deletion
             for (const tc of toolCalls) {
               await db.log.create({
                 data: {
@@ -252,9 +276,21 @@ export async function decide(
             await db.approval.delete({
               where: { id: approval.id },
             });
-          } catch (err) {
-            // Ignore if already deleted (idempotency safety)
+          } catch (err: any) {
+            // Only ignore "record not found" errors (concurrent resume).
+            // Any other failure aborts to preserve single-use protection.
+            if (err?.code !== "P2025") {
+              await db.log.create({
+                data: {
+                  tool_name: context.tool_name,
+                  decision: "DENY",
+                  reason: `Conversation: ${conversation.conversationId} | Could not delete approval record, aborting to prevent replay (ID: ${approval.id})`,
+                },
+              });
+              return { decision: "DENY", reason: "Approval record deletion failed" };
+            }
           }
+          // Write ALLOW log only after deletion is confirmed
           await db.log.create({
             data: {
               tool_name: context.tool_name,

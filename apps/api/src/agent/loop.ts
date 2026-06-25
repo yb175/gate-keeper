@@ -157,15 +157,15 @@ export async function runAgent(
       // Evaluate the tool execution policy using decide()
       const decisionContext = step.type === "tool_call"
         ? {
-            tool_name: step.tool_name,
-            arguments: step.arguments,
-            approvalId: activeApprovalId
-          }
+          tool_name: step.tool_name,
+          arguments: step.arguments,
+          approvalId: activeApprovalId
+        }
         : {
-            tool_name: "multiple_tool_calls",
-            arguments: { tool_calls: step.tool_calls },
-            approvalId: activeApprovalId
-          };
+          tool_name: "multiple_tool_calls",
+          arguments: { tool_calls: step.tool_calls },
+          approvalId: activeApprovalId
+        };
 
       logger.info("Evaluating tool execution policy", { conversation_id: conversationId, tool_name: decisionContext.tool_name });
       const decisionResult = await decide(decisionContext, { conversationId, token: accumulatedTokens });
@@ -195,14 +195,15 @@ export async function runAgent(
       }
 
       if (decisionResult.decision === "ALLOW") {
+        const failures: { tool_name: string; error: string }[] = [];
         try {
           const executions = step.type === "tool_call"
             ? [{ tool_name: step.tool_name, arguments: step.arguments }]
             : step.tool_calls;
-
+ 
           logger.info("Executing approved tool call(s)", { conversation_id: conversationId, count: executions.length });
-
-          const results = await Promise.all(
+ 
+          const results = await Promise.allSettled(
             executions.map(async (exec) => {
               const res = await mcpExecutor.execute(exec.tool_name, exec.arguments, {
                 conversationId,
@@ -211,22 +212,67 @@ export async function runAgent(
               return { tool_name: exec.tool_name, result: res };
             })
           );
-
+ 
           // Reset approval ID once execution has completed
           activeApprovalId = undefined;
           memory.clearApproval();
-
-          // Store results in memory history
-          for (const item of results) {
-            memory.addToolResult(item.result);
+ 
+          const successResults: any[] = [];
+ 
+          for (let i = 0; i < results.length; i++) {
+            const outcome = results[i];
+            const exec = executions[i];
+            if (!outcome || !exec) continue;
+ 
+            if (outcome.status === "fulfilled") {
+              const val = (outcome as PromiseFulfilledResult<{ tool_name: string; result: unknown; }>).value;
+              successResults.push(val);
+              memory.addToolResult(val.result);
+            } else {
+              const reason = (outcome as PromiseRejectedResult).reason;
+              const errMsg = reason?.message || String(reason);
+              failures.push({ tool_name: exec.tool_name, error: errMsg });
+              memory.addToolResult({
+                tool_name: exec.tool_name,
+                isError: true,
+                error: errMsg
+              });
+            }
           }
+ 
+          // Format results for the agent message history
           if (step.type === "tool_call") {
-            memory.addMessage("tool", JSON.stringify(results[0]?.result));
+            const outcome = results[0];
+            if (outcome && outcome.status === "fulfilled") {
+              const val = (outcome as PromiseFulfilledResult<{ tool_name: string; result: unknown; }>).value;
+              memory.addMessage("tool", JSON.stringify(val.result));
+            } else if (outcome) {
+              const reason = (outcome as PromiseRejectedResult).reason;
+              memory.addMessage("tool", JSON.stringify({ error: reason?.message || String(reason) }));
+            }
           } else {
-            memory.addMessage("tool", JSON.stringify(results));
+            // For parallel calls, return an array of results/errors in the same order
+            const formattedList = results.map((outcome) => {
+              if (outcome.status === "fulfilled") {
+                return (outcome as PromiseFulfilledResult<{ tool_name: string; result: unknown; }>).value.result;
+              } else {
+                const reason = (outcome as PromiseRejectedResult).reason;
+                return { error: reason?.message || String(reason) };
+              }
+            });
+            memory.addMessage("tool", JSON.stringify(formattedList));
           }
+ 
         } catch (execError: any) {
           throw new Error(`Tool execution failed: ${execError.message || execError}`);
+        }
+ 
+        if (failures.length > 0) {
+          const firstFail = failures[0];
+          if (failures.length === 1 && step.type === "tool_call" && firstFail) {
+            throw new Error(`Tool execution failed: ${firstFail.error}`);
+          }
+          throw new Error(`Tool execution failed for: ${failures.map(f => `${f.tool_name} (${f.error})`).join(", ")}`);
         }
       }
     }

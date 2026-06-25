@@ -21,7 +21,9 @@ const nextConfig = {
   },
   env: {
     API_PORT: process.env.API_PORT || "3001",
-    PORT: process.env.PORT || "3001",
+    PORT: process.env.PORT || "3000",
+    NEXT_PUBLIC_API_PORT: process.env.API_PORT || "3001",
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "",
   },
 };
 

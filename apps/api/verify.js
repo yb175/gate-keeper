@@ -1,14 +1,28 @@
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const API_URL = "http://localhost:3001";
-const sandboxDir = "/home/yb175/projects/gate-keeper/apps/file-manager-mcp/sandbox";
+// Resolved relative to this script — portable across any checkout location
+const sandboxDir = path.resolve(__dirname, "../file-manager-mcp/sandbox");
 
 async function runVerification() {
   console.log("=== STARTING GATEKEEPER END-TO-END VERIFICATION (FETCH) ===");
 
   const conversationId = `verify_conv_${Math.random().toString(36).substring(2, 9)}`;
   console.log(`Using Conversation ID: ${conversationId}`);
+
+  // Track pre-existing write_file policy so we can restore it exactly.
+  // null  = no policy existed before this run (delete it on cleanup)
+  // obj   = policy existed (restore its original action on cleanup)
+  let originalWriteFilePolicy = null;
+  let policyWasCreatedByVerify = false;
+
+  // Track created sandbox files so we can delete them in finally
+  const createdFiles = [];
 
   try {
     // 1. Check existing policies
@@ -17,8 +31,34 @@ async function runVerification() {
     const policiesData = await policiesRes.json();
     console.log("Active policies count:", policiesData.length);
 
-    // 2. Run agent prompt that triggers a write_file tool call (which should require approval since no policy exists)
-    console.log("\n[2] Submitting prompt to write file (should be paused for approval)...");
+    // Remember any pre-existing write_file policy so cleanup can restore it
+    originalWriteFilePolicy = policiesData.find(p => p.tool_name === "write_file") || null;
+    if (originalWriteFilePolicy) {
+      console.log(`Pre-existing write_file policy found: action=${originalWriteFilePolicy.action}`);
+    }
+
+    // 2. Set policy to APPROVAL so step 2 reliably produces PENDING regardless
+    //    of what was in DB before the run.
+    console.log("\n[2] Ensuring write_file policy is APPROVAL for verification...");
+    if (originalWriteFilePolicy) {
+      if (originalWriteFilePolicy.action !== "APPROVAL") {
+        await fetch(`${API_URL}/policies/write_file`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "APPROVAL" }),
+        });
+      }
+    } else {
+      await fetch(`${API_URL}/policies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tool_name: "write_file", action: "APPROVAL" }),
+      });
+      policyWasCreatedByVerify = true;
+    }
+
+    // 3. Run agent prompt that triggers write_file (should be paused for approval)
+    console.log("\n[3] Submitting prompt to write file (should be paused for approval)...");
     const run1Res = await fetch(`${API_URL}/agent/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -31,15 +71,15 @@ async function runVerification() {
 
     console.log("Agent Run 1 Status:", run1Data.status);
     console.log("Agent Run 1 Approval ID:", run1Data.approvalId);
-    
+
     if (run1Data.status !== "PENDING" || !run1Data.approvalId) {
       throw new Error(`Expected PENDING status and approval ID, got: ${JSON.stringify(run1Data)}`);
     }
 
     const approvalId = run1Data.approvalId;
 
-    // 3. Verify the approval exists in the approvals list
-    console.log("\n[3] Fetching approvals list...");
+    // 4. Verify the approval exists in the approvals list
+    console.log("\n[4] Fetching approvals list...");
     const approvalsRes = await fetch(`${API_URL}/approvals`);
     const approvalsData = await approvalsRes.json();
     const foundApproval = approvalsData.find(app => app.id === approvalId);
@@ -48,16 +88,16 @@ async function runVerification() {
     }
     console.log("Found approval details in GET /approvals:", JSON.stringify(foundApproval));
 
-    // 4. Approve the request
-    console.log(`\n[4] Approving request ${approvalId}...`);
+    // 5. Approve the request
+    console.log(`\n[5] Approving request ${approvalId}...`);
     const approveRes = await fetch(`${API_URL}/policies/approvals/${approvalId}/approve`, {
       method: "POST"
     });
     const approveData = await approveRes.json();
     console.log("Approve response:", JSON.stringify(approveData));
 
-    // 5. Resume the agent run with the approvalId
-    console.log("\n[5] Resuming agent execution with approval...");
+    // 6. Resume the agent run with the approvalId
+    console.log("\n[6] Resuming agent execution with approval...");
     const resumeRes = await fetch(`${API_URL}/agent/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -74,6 +114,7 @@ async function runVerification() {
 
     // Verify sandbox/test.txt exists and has the correct content
     const testTxtPath = path.join(sandboxDir, "test.txt");
+    createdFiles.push(testTxtPath);
     if (!fs.existsSync(testTxtPath)) {
       throw new Error(`File was not created at ${testTxtPath}`);
     }
@@ -84,44 +125,24 @@ async function runVerification() {
     }
     console.log("File verification: SUCCESS");
 
-    // 6. Check decision logs
-    console.log("\n[6] Fetching decision logs...");
+    // 7. Check decision logs
+    console.log("\n[7] Fetching decision logs...");
     const logsRes = await fetch(`${API_URL}/logs`);
     const logsData = await logsRes.json();
     const runLogs = logsData.filter(log => log.reason && log.reason.includes(conversationId));
     console.log(`Logs generated for conversation ${conversationId}:`);
     console.log(JSON.stringify(runLogs, null, 2));
 
-    // 7. Create an ALLOW policy for write_file
-    console.log("\n[7] Creating ALLOW policy for write_file tool...");
-    const createPolicyRes = await fetch(`${API_URL}/policies`, {
-      method: "POST",
+    // 8. Update policy to ALLOW and run again without approval
+    console.log("\n[8] Updating write_file policy to ALLOW...");
+    await fetch(`${API_URL}/policies/write_file`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tool_name: "write_file",
-        action: "ALLOW"
-      })
+      body: JSON.stringify({ action: "ALLOW" }),
     });
-    
-    if (createPolicyRes.status === 409) {
-      console.log("Policy already exists, updating to ALLOW...");
-      const updatePolicyRes = await fetch(`${API_URL}/policies/write_file`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "ALLOW"
-        })
-      });
-      const updatePolicyData = await updatePolicyRes.json();
-      console.log("Updated policy:", JSON.stringify(updatePolicyData));
-    } else {
-      const createPolicyData = await createPolicyRes.json();
-      console.log("Created policy:", JSON.stringify(createPolicyData));
-    }
 
-    // 8. Submit another write prompt (should complete automatically without approval)
     const conversationId2 = `verify_conv_auto_${Math.random().toString(36).substring(2, 9)}`;
-    console.log(`\n[8] Submitting prompt to write file with ALLOW policy (Conversation: ${conversationId2})...`);
+    console.log(`\n[9] Submitting prompt to write file with ALLOW policy (Conversation: ${conversationId2})...`);
     const run2Res = await fetch(`${API_URL}/agent/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -136,29 +157,51 @@ async function runVerification() {
     console.log("Agent Run 2 Final Answer:", run2Data.answer);
 
     const allowedTxtPath = path.join(sandboxDir, "allowed.txt");
+    createdFiles.push(allowedTxtPath);
     if (!fs.existsSync(allowedTxtPath)) {
       throw new Error(`File was not created at ${allowedTxtPath}`);
     }
     const allowedContent = fs.readFileSync(allowedTxtPath, "utf-8");
     console.log(`File content at ${allowedTxtPath}: "${allowedContent}"`);
 
-    // Clean up created files
-    fs.unlinkSync(testTxtPath);
-    fs.unlinkSync(allowedTxtPath);
-    console.log("Cleaned up sandbox files.");
-
-    // Clean up created policy so DB remains clean
-    console.log("\n[9] Deleting test policy to restore original DB state...");
-    const deleteRes = await fetch(`${API_URL}/policies/write_file`, {
-      method: "DELETE"
-    });
-    console.log("Deleted test policy status:", deleteRes.status);
-
     console.log("\n=== ALL E2E API VERIFICATIONS PASSED SUCCESSFULLY ===");
   } catch (error) {
     console.error("\n!!! VERIFICATION FAILED !!!");
     console.error(error.message);
-    process.exit(1);
+  } finally {
+    // Always clean up sandbox files and restore policy state, even on failure.
+    console.log("\n[cleanup] Removing created sandbox files...");
+    for (const filePath of createdFiles) {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`  Deleted: ${filePath}`);
+        }
+      } catch (err) {
+        console.error(`  Failed to delete ${filePath}:`, err.message);
+      }
+    }
+
+    console.log("[cleanup] Restoring write_file policy state...");
+    try {
+      if (policyWasCreatedByVerify) {
+        // We created it from scratch — delete it entirely to leave no trace
+        await fetch(`${API_URL}/policies/write_file`, { method: "DELETE" });
+        console.log("  Deleted write_file policy (was created by verify).");
+      } else if (originalWriteFilePolicy) {
+        // Restore the original action the policy had before the run
+        await fetch(`${API_URL}/policies/write_file`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: originalWriteFilePolicy.action }),
+        });
+        console.log(`  Restored write_file policy to: ${originalWriteFilePolicy.action}`);
+      }
+    } catch (cleanupErr) {
+      console.error("  Policy cleanup failed:", cleanupErr.message);
+    }
+    // Exit with failure code if the try block caught an error
+    // (process.exit in catch is removed; rely on unhandled rejection propagation)
   }
 }
 

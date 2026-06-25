@@ -92,9 +92,13 @@ export default async function withinSandboxPath(
     // Resolve the real sandbox root (handles the root being a symlink itself)
     const sandboxRoot = resolveSandboxRoot(rawRoot);
 
-    // Collect every string-valued argument — these are the potential file paths
+    // Only inspect argument keys that are known to carry file-system paths.
+    // Checking every string value (e.g. write_file's 'content' field) would
+    // trigger false DENY results for legitimate content containing ".." sequences.
+    const PATH_KEYS = new Set(["path", "source", "destination", "directory"]);
+
     const pathArgs = Object.entries(args)
-      .filter(([, v]) => typeof v === "string")
+      .filter(([k, v]) => PATH_KEYS.has(k) && typeof v === "string")
       .map(([k, v]) => ({ key: k, value: v as string }));
 
     // If the tool takes no string arguments, there is nothing to check
@@ -129,10 +133,13 @@ export default async function withinSandboxPath(
       // Resolve against the real sandbox root
       const resolved = nodePath.resolve(sandboxRoot, cleanValue);
 
-      // Edge-case 4 & 5: syntactic check — catches ".." traversal and absolute
-      // paths that land outside the sandbox without touching the filesystem
+      // Edge-case 4 & 5: syntactic check — catches traversal and absolute
+      // paths that land outside the sandbox without touching the filesystem.
+      // Use exact segment boundaries to avoid false-positives on names like "..foo":
+      // a path escapes if any segment is exactly "..".
       const relative = nodePath.relative(sandboxRoot, resolved);
-      if (relative.startsWith("..") || nodePath.isAbsolute(relative)) {
+      const escapesViaDotDot = relative.split(nodePath.sep).some(seg => seg === "..");
+      if (escapesViaDotDot || nodePath.isAbsolute(relative)) {
         logger.warn("Path argument escapes sandbox (syntactic check)", {
           tool_name,
           key,
@@ -149,7 +156,8 @@ export default async function withinSandboxPath(
       // Edge-case 6: symlink traversal — resolve real ancestor and re-check
       const realResolved = getRealAncestor(resolved);
       const realRelative = nodePath.relative(sandboxRoot, realResolved);
-      if (realRelative.startsWith("..") || nodePath.isAbsolute(realRelative)) {
+      const realEscapesViaDotDot = realRelative.split(nodePath.sep).some(seg => seg === "..");
+      if (realEscapesViaDotDot || nodePath.isAbsolute(realRelative)) {
         logger.warn("Path argument escapes sandbox via symlink (real path check)", {
           tool_name,
           key,

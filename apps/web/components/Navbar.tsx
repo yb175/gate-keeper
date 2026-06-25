@@ -27,7 +27,7 @@ export default function Navbar() {
           {/* Navigation Links */}
           <nav className="flex space-x-1">
             {navItems.map((item) => {
-              const isActive = pathname.startsWith(item.href);
+              const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               const Icon = item.icon;
               return (
                 <Link

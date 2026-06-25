@@ -86,7 +86,7 @@ export default function ChatWindow({
           ) : (
             messages.map((msg, index) => {
               const isUser = msg.role === "user";
-              const isTool = msg.role === "tool" || parseToolTrace(msg.content);
+              const isTool = msg.role === "tool" || (!isUser && parseToolTrace(msg.content));
 
               if (isTool) {
                 return (

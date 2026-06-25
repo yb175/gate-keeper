@@ -273,6 +273,9 @@ If you are done and have a final answer, output:
     if (!Array.isArray(tool_calls)) {
       throw new Error("Invalid LLM output structure for parallel tool calls");
     }
+    if (tool_calls.length === 0) {
+      throw new Error("LLM returned an empty tool_calls array; at least one tool is required");
+    }
 
     for (const tc of tool_calls) {
       if (!tc || typeof tc !== "object" || typeof tc.tool_name !== "string" || !tc.arguments || typeof tc.arguments !== "object" || Array.isArray(tc.arguments)) {

@@ -135,7 +135,8 @@ app.post("/agent/run", async (req, res) => {
     });
   } catch (error: any) {
     console.error("Agent execution failed:", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    // Do not expose internal error details to clients
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

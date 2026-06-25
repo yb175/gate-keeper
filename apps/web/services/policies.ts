@@ -1,7 +1,16 @@
 import axios from "axios";
 
-const API_PORT = process.env.API_PORT || "3001";
-const API_URL = `http://localhost:${API_PORT}`;
+const getApiUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  const port = process.env.NEXT_PUBLIC_API_PORT || "3001";
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:${port}`;
+  }
+  return `http://localhost:${port}`;
+};
+const API_URL = getApiUrl();
 
 export type PolicyAction = "ALLOW" | "APPROVAL" | "DENY";
 
@@ -24,14 +33,14 @@ export async function createPolicy(tool_name: string, action: PolicyAction): Pro
 }
 
 export async function updatePolicy(toolName: string, action: PolicyAction): Promise<Policy> {
-  const response = await axios.patch<Policy>(`${API_URL}/policies/${toolName}`, {
+  const response = await axios.patch<Policy>(`${API_URL}/policies/${encodeURIComponent(toolName)}`, {
     action,
   });
   return response.data;
 }
 
 export async function deletePolicy(toolName: string): Promise<void> {
-  await axios.delete(`${API_URL}/policies/${toolName}`);
+  await axios.delete(`${API_URL}/policies/${encodeURIComponent(toolName)}`);
 }
 
 export interface McpTool {

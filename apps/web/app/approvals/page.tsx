@@ -20,10 +20,18 @@ export default function ApprovalsPage() {
   };
 
   useEffect(() => {
-    fetchApprovalsData();
-    // Poll for new approvals every 5 seconds
-    const interval = setInterval(fetchApprovalsData, 5000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+
+    const poll = async () => {
+      await fetchApprovalsData();
+      if (!cancelled) {
+        // Only schedule the next fetch after the previous one completes
+        setTimeout(poll, 5000);
+      }
+    };
+
+    poll();
+    return () => { cancelled = true; };
   }, []);
 
   const handleApprove = async (id: string) => {

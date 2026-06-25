@@ -4,6 +4,6 @@ import { StdioMCPServer } from "../../stdio-server.js";
 export const puppeteerPlugin = new StdioMCPServer(
   "puppeteer",
   "npx",
-  ["@modelcontextprotocol/server-puppeteer"],
+  ["-y", "@modelcontextprotocol/server-puppeteer"],
   {}
 );

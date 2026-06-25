@@ -252,9 +252,8 @@ router.post(
 router.get("/approvals", async (req: Request, res: Response): Promise<void> => {
   try {
     const approvals = await db.approval.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
     });
     res.json(approvals);
   } catch (error) {
@@ -266,9 +265,8 @@ router.get("/approvals", async (req: Request, res: Response): Promise<void> => {
 router.get("/logs", async (req: Request, res: Response): Promise<void> => {
   try {
     const logs = await db.log.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
     });
     res.json(logs);
   } catch (error) {

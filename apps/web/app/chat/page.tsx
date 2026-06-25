@@ -30,15 +30,41 @@ export default function ChatPage() {
   // Load state on mount if not hydrated
   useEffect(() => {
     if (!isHydrated) {
-      dispatch(hydrateChatState());
+      const savedConvId = localStorage.getItem("gatekeeper_conversationId");
+      const savedMessages = localStorage.getItem("gatekeeper_messages");
+      const savedPendingApprovalId = localStorage.getItem("gatekeeper_pendingApprovalId");
+      const savedPendingToolName = localStorage.getItem("gatekeeper_pendingToolName");
+      const rawStatus = localStorage.getItem("gatekeeper_pendingApprovalStatus");
+      
+      const savedPendingApprovalStatus = (rawStatus === "PENDING" || rawStatus === "APPROVED" || rawStatus === "REJECTED")
+        ? (rawStatus as "PENDING" | "APPROVED" | "REJECTED")
+        : null;
+
+      let parsedMessages: ChatMessage[] = [];
+      if (savedMessages) {
+        try {
+          parsedMessages = JSON.parse(savedMessages);
+        } catch (e) {
+          console.error("Error parsing saved messages", e);
+        }
+      }
+
+      const conversationId = savedConvId || `conv_${Math.random().toString(36).substring(2, 9)}`;
+
+      dispatch(hydrateChatState({
+        conversationId,
+        messages: parsedMessages,
+        pendingApprovalId: savedPendingApprovalId,
+        pendingToolName: savedPendingToolName,
+        pendingApprovalStatus: savedPendingApprovalStatus,
+      }));
     }
   }, [dispatch, isHydrated]);
-
-
-
+ 
   const handleNewChat = () => {
     if (confirm("Are you sure you want to clear the chat history and start a new session?")) {
-      dispatch(clearChatState());
+      const newId = `conv_${Math.random().toString(36).substring(2, 9)}`;
+      dispatch(clearChatState(newId));
     }
   };
 
@@ -177,29 +203,114 @@ export default function ChatPage() {
   const handleApproveRef = useRef(handleApprove);
   const handleRejectRef = useRef(handleReject);
   const loadingRef = useRef(loading);
-
+ 
+  const handleResumeAfterApproval = async (approvalId: string) => {
+    dispatch(setLoading(true));
+    try {
+      const res = await runAgentMessage(
+        null,
+        conversationId,
+        approvalId,
+        messages
+      );
+ 
+      if (res.history) {
+        dispatch(setMessages(res.history));
+      } else if (res.answer) {
+        dispatch(setMessages([...messages, { role: "assistant", content: res.answer! }]));
+      }
+ 
+      if (res.status === "PENDING" && res.approvalId) {
+        let toolName = "requested_tool";
+        const lastMsg = res.history[res.history.length - 1];
+        if (lastMsg && lastMsg.content.includes("Call tool ")) {
+          const match = lastMsg.content.match(/Call tool (\w+)/);
+          toolName = (match && match[1]) || "requested_tool";
+        }
+        dispatch(setPendingApproval({ id: res.approvalId, toolName }));
+      } else {
+        dispatch(setPendingApproval({ id: null, toolName: null }));
+      }
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error || "An error occurred during execution resume.";
+      dispatch(setMessages([
+        ...messages,
+        { role: "assistant", content: `Error: ${errMsg}` } as ChatMessage,
+      ]));
+      dispatch(setPendingApproval({ id: null, toolName: null }));
+    } finally {
+      dispatch(setLoading(false));
+    }
+  };
+ 
+  const handleResumeAfterRejection = async (approvalId: string) => {
+    dispatch(setLoading(true));
+    try {
+      const res = await runAgentMessage(
+        null,
+        conversationId,
+        approvalId,
+        messages
+      );
+ 
+      if (res.history) {
+        dispatch(setMessages(res.history));
+      } else if (res.reason) {
+        dispatch(setMessages([
+          ...messages,
+          { role: "assistant", content: `Execution Rejected: ${res.reason}` },
+        ]));
+      }
+ 
+      dispatch(setPendingApproval({ id: null, toolName: null }));
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error || "Failed to resume after rejection.";
+      dispatch(setMessages([
+        ...messages,
+        { role: "assistant", content: `Error: ${errMsg}` } as ChatMessage,
+      ]));
+      dispatch(setPendingApproval({ id: null, toolName: null }));
+    } finally {
+      dispatch(setLoading(false));
+    }
+  };
+ 
+  const handleResumeAfterApprovalRef = useRef(handleResumeAfterApproval);
+  const handleResumeAfterRejectionRef = useRef(handleResumeAfterRejection);
+ 
   useEffect(() => {
     handleApproveRef.current = handleApprove;
     handleRejectRef.current = handleReject;
+    handleResumeAfterApprovalRef.current = handleResumeAfterApproval;
+    handleResumeAfterRejectionRef.current = handleResumeAfterRejection;
     loadingRef.current = loading;
-  }, [handleApprove, handleReject, loading]);
-
-  // Polling approval status for real-time automatic execution resume/abort
+  }, [handleApprove, handleReject, handleResumeAfterApproval, handleResumeAfterRejection, loading]);
+ 
+  // Polling approval status for real-time automatic execution resume/abort.
+  // isRunningRef is a synchronous guard that prevents concurrent checkStatus
+  // calls when the interval fires before loadingRef has been updated by React's
+  // render cycle (loadingRef syncs inside a useEffect, not synchronously).
+  const isRunningRef = useRef(false);
+ 
   useEffect(() => {
     let intervalId: any;
-
+ 
     const checkStatus = async () => {
-      if (!pendingApprovalId || loadingRef.current) return;
+      // P1 fix: check isRunningRef synchronously before the first await so the
+      // interval cannot fire a second overlapping call while the first is still
+      // awaiting getApprovals(), even if loadingRef hasn't updated yet.
+      if (!pendingApprovalId || loadingRef.current || isRunningRef.current) return;
+      isRunningRef.current = true;
       try {
         const list = await getApprovals();
         const match = list.find((item) => item.id === pendingApprovalId);
         if (match) {
           if (match.status === "APPROVED") {
             clearInterval(intervalId);
-            handleApproveRef.current(pendingApprovalId);
+            handleResumeAfterApprovalRef.current(pendingApprovalId);
           } else if (match.status === "REJECTED") {
             clearInterval(intervalId);
-            handleRejectRef.current(pendingApprovalId);
+            handleResumeAfterRejectionRef.current(pendingApprovalId);
           } else {
             dispatch(setPendingApproval({
               id: pendingApprovalId,
@@ -213,6 +324,8 @@ export default function ChatPage() {
         }
       } catch (err) {
         console.error("Failed to poll approval status", err);
+      } finally {
+        isRunningRef.current = false;
       }
     };
 
