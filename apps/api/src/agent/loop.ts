@@ -85,6 +85,7 @@ export async function runAgent(
         if (!approval) {
           logger.warn("Resumed approval record not found", { conversation_id: conversationId, approval_id: activeApprovalId });
           await updateTokens();
+          memory.addMessage("assistant", "Execution Denied: Approval not found");
           return {
             status: "DENY",
             reason: "Approval not found",
@@ -105,6 +106,8 @@ export async function runAgent(
         if (approval.status !== ApprovalStatus.APPROVED) {
           logger.warn("Resumed approval record is not approved", { conversation_id: conversationId, approval_id: activeApprovalId, status: approval.status });
           await updateTokens();
+          const reasonMsg = approval.status === ApprovalStatus.REJECTED ? "Approval rejected" : "Approval not approved";
+          memory.addMessage("assistant", `Execution Denied: ${reasonMsg}`);
           return {
             status: "DENY",
             reason: "Approval not approved",
@@ -112,11 +115,18 @@ export async function runAgent(
           };
         }
 
-        step = {
-          type: "tool_call",
-          tool_name: approval.tool_name,
-          arguments: approval.arguments as Record<string, unknown>
-        };
+        if (approval.tool_name === "multiple_tool_calls") {
+          step = {
+            type: "tool_calls",
+            tool_calls: (approval.arguments as any).tool_calls
+          };
+        } else {
+          step = {
+            type: "tool_call",
+            tool_name: approval.tool_name,
+            arguments: approval.arguments as Record<string, unknown>
+          };
+        }
       } else {
         // Consult the LLM to get the next step
         const nextResult = await nextStep(memory, tools);
@@ -138,21 +148,32 @@ export async function runAgent(
       }
 
       // Record tool call to assistant messages
-      memory.addMessage("assistant", `Call tool ${step.tool_name} with arguments: ${JSON.stringify(step.arguments)}`);
+      if (step.type === "tool_call") {
+        memory.addMessage("assistant", `Call tool ${step.tool_name} with arguments: ${JSON.stringify(step.arguments)}`);
+      } else {
+        memory.addMessage("assistant", `Call parallel tools: ${JSON.stringify(step.tool_calls)}`);
+      }
 
       // Evaluate the tool execution policy using decide()
-      const decisionContext = {
-        tool_name: step.tool_name,
-        arguments: step.arguments,
-        approvalId: activeApprovalId
-      };
+      const decisionContext = step.type === "tool_call"
+        ? {
+          tool_name: step.tool_name,
+          arguments: step.arguments,
+          approvalId: activeApprovalId
+        }
+        : {
+          tool_name: "multiple_tool_calls",
+          arguments: { tool_calls: step.tool_calls },
+          approvalId: activeApprovalId
+        };
 
-      logger.info("Evaluating tool execution policy", { conversation_id: conversationId, tool_name: step.tool_name });
+      logger.info("Evaluating tool execution policy", { conversation_id: conversationId, tool_name: decisionContext.tool_name });
       const decisionResult = await decide(decisionContext, { conversationId, token: accumulatedTokens });
-      logger.info("Policy decision evaluated", { conversation_id: conversationId, tool_name: step.tool_name, decision: decisionResult.decision });
+      logger.info("Policy decision evaluated", { conversation_id: conversationId, tool_name: decisionContext.tool_name, decision: decisionResult.decision });
 
       if (decisionResult.decision === "DENY") {
         await updateTokens();
+        memory.addMessage("assistant", `Execution Denied: ${decisionResult.reason || "Tool execution denied"}`);
         return {
           status: "DENY",
           reason: decisionResult.reason || "Tool execution denied",
@@ -174,22 +195,84 @@ export async function runAgent(
       }
 
       if (decisionResult.decision === "ALLOW") {
+        const failures: { tool_name: string; error: string }[] = [];
         try {
-          logger.info("Executing approved tool call", { conversation_id: conversationId, tool_name: step.tool_name });
-          const result = await mcpExecutor.execute(step.tool_name, step.arguments, {
-            conversationId,
-            decision: "ALLOW"
-          });
-
+          const executions = step.type === "tool_call"
+            ? [{ tool_name: step.tool_name, arguments: step.arguments }]
+            : step.tool_calls;
+ 
+          logger.info("Executing approved tool call(s)", { conversation_id: conversationId, count: executions.length });
+ 
+          const results = await Promise.allSettled(
+            executions.map(async (exec) => {
+              const res = await mcpExecutor.execute(exec.tool_name, exec.arguments, {
+                conversationId,
+                decision: "ALLOW"
+              });
+              return { tool_name: exec.tool_name, result: res };
+            })
+          );
+ 
           // Reset approval ID once execution has completed
           activeApprovalId = undefined;
           memory.clearApproval();
-
-          // Store results in memory history
-          memory.addToolResult(result);
-          memory.addMessage("tool", JSON.stringify(result));
+ 
+          const successResults: any[] = [];
+ 
+          for (let i = 0; i < results.length; i++) {
+            const outcome = results[i];
+            const exec = executions[i];
+            if (!outcome || !exec) continue;
+ 
+            if (outcome.status === "fulfilled") {
+              const val = (outcome as PromiseFulfilledResult<{ tool_name: string; result: unknown; }>).value;
+              successResults.push(val);
+              memory.addToolResult(val.result);
+            } else {
+              const reason = (outcome as PromiseRejectedResult).reason;
+              const errMsg = reason?.message || String(reason);
+              failures.push({ tool_name: exec.tool_name, error: errMsg });
+              memory.addToolResult({
+                tool_name: exec.tool_name,
+                isError: true,
+                error: errMsg
+              });
+            }
+          }
+ 
+          // Format results for the agent message history
+          if (step.type === "tool_call") {
+            const outcome = results[0];
+            if (outcome && outcome.status === "fulfilled") {
+              const val = (outcome as PromiseFulfilledResult<{ tool_name: string; result: unknown; }>).value;
+              memory.addMessage("tool", JSON.stringify(val.result));
+            } else if (outcome) {
+              const reason = (outcome as PromiseRejectedResult).reason;
+              memory.addMessage("tool", JSON.stringify({ error: reason?.message || String(reason) }));
+            }
+          } else {
+            // For parallel calls, return an array of results/errors in the same order
+            const formattedList = results.map((outcome) => {
+              if (outcome.status === "fulfilled") {
+                return (outcome as PromiseFulfilledResult<{ tool_name: string; result: unknown; }>).value.result;
+              } else {
+                const reason = (outcome as PromiseRejectedResult).reason;
+                return { error: reason?.message || String(reason) };
+              }
+            });
+            memory.addMessage("tool", JSON.stringify(formattedList));
+          }
+ 
         } catch (execError: any) {
           throw new Error(`Tool execution failed: ${execError.message || execError}`);
+        }
+ 
+        if (failures.length > 0) {
+          const firstFail = failures[0];
+          if (failures.length === 1 && step.type === "tool_call" && firstFail) {
+            throw new Error(`Tool execution failed: ${firstFail.error}`);
+          }
+          throw new Error(`Tool execution failed for: ${failures.map(f => `${f.tool_name} (${f.error})`).join(", ")}`);
         }
       }
     }

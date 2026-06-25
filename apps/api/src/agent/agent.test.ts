@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { runAgent } from "./loop.js";
 import { createMemory } from "./memory.js";
-import { llmClient } from "./llm.js";
+import { llmClient, nextStep } from "./llm.js";
 
 // Mock @repo/db
 vi.mock("@repo/db", () => {
@@ -423,6 +423,91 @@ describe("Agent Module & Execution Loop", () => {
 
     expect(result.status).toBe("DENY");
     expect(result.reason).toBe("Approval not approved");
+  });
+
+  // 14) Parallel Tool Execution tests
+  describe("Parallel Tool Execution", () => {
+    it("should parse type: tool_calls from LLM and validate schemas", async () => {
+      vi.spyOn(llmClient, "callModel").mockResolvedValue(
+        JSON.stringify({
+          type: "tool_calls",
+          tool_calls: [
+            { tool_name: "test_tool", arguments: { arg1: "val1" } },
+            { tool_name: "test_tool", arguments: { arg1: "val2" } }
+          ]
+        })
+      );
+
+      const memory = createMemory();
+      const tools = [
+        {
+          name: "test_tool",
+          description: "A test tool",
+          inputSchema: { type: "object", properties: { arg1: { type: "string" } } },
+          execute: vi.fn(),
+        }
+      ];
+
+      const res = await nextStep(memory, tools);
+      expect(res.step.type).toBe("tool_calls");
+      if (res.step.type === "tool_calls") {
+        expect(res.step.tool_calls).toHaveLength(2);
+        expect(res.step.tool_calls[0]?.tool_name).toBe("test_tool");
+      }
+    });
+
+    it("should execute parallel tool calls successfully when allowed", async () => {
+      let callCount = 0;
+      vi.spyOn(llmClient, "callModel").mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return JSON.stringify({
+            type: "tool_calls",
+            tool_calls: [
+              { tool_name: "test_tool", arguments: { arg1: "val1" } },
+              { tool_name: "test_tool", arguments: { arg1: "val2" } }
+            ]
+          });
+        }
+        return JSON.stringify({
+          type: "final_answer",
+          answer: "Finished parallel work.",
+        });
+      });
+
+      vi.mocked(decide).mockResolvedValue({
+        decision: "ALLOW",
+      });
+
+      vi.mocked(mcpExecutor.execute).mockResolvedValue("mockResult");
+
+      const result = await runAgent("Do parallel tasks", "conv-parallel-1");
+      expect(result.status).toBe("SUCCESS");
+      expect(result.answer).toBe("Finished parallel work.");
+      expect(mcpExecutor.execute).toHaveBeenCalledTimes(2);
+      expect(result.memory.toolResults).toContain("mockResult");
+    });
+
+    it("should request approval for parallel tool calls when pending", async () => {
+      vi.spyOn(llmClient, "callModel").mockResolvedValue(
+        JSON.stringify({
+          type: "tool_calls",
+          tool_calls: [
+            { tool_name: "test_tool", arguments: { arg1: "val1" } }
+          ]
+        })
+      );
+
+      vi.mocked(decide).mockResolvedValue({
+        decision: "PENDING",
+        reason: "approval-parallel-123",
+      });
+
+      const result = await runAgent("Do parallel task requiring approval", "conv-parallel-2");
+      expect(result.status).toBe("PENDING");
+      expect(result.approvalId).toBe("approval-parallel-123");
+      expect(result.memory.approvalId).toBe("approval-parallel-123");
+    });
   });
 
   describe("Gemini API Client Timeout", () => {
