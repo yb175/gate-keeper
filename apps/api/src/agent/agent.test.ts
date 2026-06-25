@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { runAgent } from "./loop.js";
 import { createMemory } from "./memory.js";
 import { llmClient } from "./llm.js";
@@ -83,6 +83,10 @@ describe("Agent Module & Execution Loop", () => {
       tool: mockTool,
     });
     vi.mocked(mcpDiscovery.discoverTools).mockResolvedValue(mockToolsMap);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   // 1) tool call - LLM requests a tool call
@@ -419,5 +423,31 @@ describe("Agent Module & Execution Loop", () => {
 
     expect(result.status).toBe("DENY");
     expect(result.reason).toBe("Approval not approved");
+  });
+
+  describe("Gemini API Client Timeout", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      delete process.env.GEMINI_TIMEOUT_MS;
+    });
+
+    it("should abort the fetch request if it exceeds the timeout limit", async () => {
+      vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+        expect(init?.signal).toBeDefined();
+        await new Promise((_, reject) => {
+          if (init?.signal) {
+            init.signal.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }
+        });
+        throw new Error("Should have timed out and aborted");
+      });
+
+      process.env.GEMINI_API_KEY = "dummy-key";
+      process.env.GEMINI_TIMEOUT_MS = "50"; // 50ms timeout for test speed
+
+      await expect(llmClient.callModel("Hello")).rejects.toThrow("The operation was aborted");
+    });
   });
 });

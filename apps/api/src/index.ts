@@ -88,6 +88,12 @@ app.post("/agent/run", async (req, res) => {
       }
     }
 
+    const hasMessage = typeof message === "string" && message.trim() !== "";
+    const hasApproval = typeof approvalId === "string" && approvalId.trim() !== "";
+    if (!hasMessage && !hasApproval) {
+      return res.status(400).json({ error: "Either message or approvalId must be provided" });
+    }
+
     if (history !== undefined) {
       if (!Array.isArray(history)) {
         return res.status(400).json({ error: "history must be an array" });

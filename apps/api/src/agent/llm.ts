@@ -8,6 +8,10 @@ export const llmClient = {
       throw new Error("GEMINI_API_KEY environment variable is not defined");
     }
 
+    const timeoutMs = process.env.GEMINI_TIMEOUT_MS
+      ? parseInt(process.env.GEMINI_TIMEOUT_MS, 10)
+      : 30000;
+
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
       {
@@ -24,6 +28,7 @@ export const llmClient = {
             responseMimeType: "application/json"
           }
         }),
+        signal: AbortSignal.timeout(timeoutMs)
       }
     );
 
