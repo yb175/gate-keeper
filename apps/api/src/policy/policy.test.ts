@@ -679,6 +679,42 @@ describe("Policy Engine REST Endpoints", () => {
       expect(res.status).toHaveBeenCalledWith(409);
       expect(res.json).toHaveBeenCalledWith({ error: "Policy already exists" });
     });
+
+    it("should preserve empty string sandbox_path on creation", async () => {
+      const postPolicy = getHandler("/policies", "POST");
+      vi.mocked(db.policy.findUnique).mockResolvedValue(null);
+      vi.mocked(db.policy.create).mockResolvedValue({
+        tool_name: "new_tool",
+        action: PolicyAction.ALLOW,
+        sandbox_path: "",
+      } as any);
+
+      const req = {
+        body: { tool_name: "new_tool", action: "ALLOW", sandbox_path: "" },
+      } as any as Request;
+      const res = mockResponse();
+
+      await postPolicy(req, res, () => {});
+
+      expect(db.policy.create).toHaveBeenCalledWith({
+        data: {
+          tool_name: "new_tool",
+          action: PolicyAction.ALLOW,
+          sandbox_path: "",
+        },
+        select: {
+          tool_name: true,
+          action: true,
+          sandbox_path: true,
+        },
+      });
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        tool_name: "new_tool",
+        action: PolicyAction.ALLOW,
+        sandbox_path: "",
+      });
+    });
   });
 
   describe("POST /policies/approvals/:id/approve", () => {
@@ -843,6 +879,28 @@ describe("Policy Engine REST Endpoints", () => {
          { id: "app-123", tool_name: "test_tool", status: "PENDING" }
        ]);
      });
+
+    it("should return 400 for invalid page parameter", async () => {
+      const getApprovals = getHandler("/approvals", "GET");
+      const req = { query: { page: "-1" } } as any as Request;
+      const res = mockResponse();
+
+      await getApprovals(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "page must be a positive integer greater than or equal to 1" });
+    });
+
+    it("should return 400 for invalid limit parameter", async () => {
+      const getApprovals = getHandler("/approvals", "GET");
+      const req = { query: { limit: "150" } } as any as Request;
+      const res = mockResponse();
+
+      await getApprovals(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "limit must be a positive integer between 1 and 100" });
+    });
    });
  
    describe("GET /logs", () => {

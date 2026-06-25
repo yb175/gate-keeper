@@ -92,18 +92,33 @@ export default async function withinSandboxPath(
     // Resolve the real sandbox root (handles the root being a symlink itself)
     const sandboxRoot = resolveSandboxRoot(rawRoot);
 
-    // Inspect argument keys that carry file-system paths.
-    // To prevent failing open on new tools, we match any key containing path-like
-    // terms (like filePath or targetPath), while excluding content fields (like
-    // fileContent or text) to prevent false positives on legitimate content.
     const isPathKey = (key: string): boolean => {
-      const normalized = key.toLowerCase();
+      // Split camelCase by inserting underscore before capital letters
+      const snakeCase = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+      // Split by non-alphanumeric characters to get individual words
+      const words = snakeCase.split(/[^a-z0-9]+/);
+
+      const pathKeywords = ["path", "file", "dir", "folder", "src", "dest", "source", "destination", "filepath", "directory"];
       const exclusions = ["content", "text", "message", "body", "data", "code", "arguments", "args"];
-      if (exclusions.some(exc => normalized.includes(exc))) {
+
+      // Check if any word matches path keywords
+      const hasPathKeyword = words.some(w => pathKeywords.includes(w));
+      if (!hasPathKeyword) {
         return false;
       }
-      const pathKeywords = ["path", "file", "dir", "folder", "src", "dest", "source", "destination"];
-      return pathKeywords.some(keyword => normalized.includes(keyword));
+
+      // If the last word is an exclusion, or the key ends with an exclusion word, it is content
+      const lastWord = words[words.length - 1];
+      if (lastWord && exclusions.includes(lastWord)) {
+        return false;
+      }
+
+      // Check if the key ends with an exclusion suffix (handles cases like filenameContent without separators)
+      if (exclusions.some(exc => snakeCase.endsWith(exc) && !snakeCase.endsWith("path") && !snakeCase.endsWith("file") && !snakeCase.endsWith("dir"))) {
+        return false;
+      }
+
+      return true;
     };
 
     const pathArgs = Object.entries(args)

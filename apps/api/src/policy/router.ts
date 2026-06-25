@@ -96,7 +96,7 @@ router.post("/policies", async (req: Request, res: Response): Promise<void> => {
       data: {
         tool_name: normalizedToolName,
         action: action as PolicyAction,
-        sandbox_path: sandbox_path || null,
+        sandbox_path: sandbox_path !== undefined ? sandbox_path : null,
       },
       select: {
         tool_name: true,
@@ -272,11 +272,40 @@ router.post(
   }
 );
 
+function parsePaginationParams(req: Request): { page?: number; limit?: number; error?: string } {
+  const pageStr = req.query?.page;
+  const limitStr = req.query?.limit;
+
+  let page: number | undefined;
+  let limit: number | undefined;
+
+  if (pageStr !== undefined) {
+    const parsedPage = parseInt(pageStr as string, 10);
+    if (Number.isNaN(parsedPage) || parsedPage < 1) {
+      return { error: "page must be a positive integer greater than or equal to 1" };
+    }
+    page = parsedPage;
+  }
+
+  if (limitStr !== undefined) {
+    const parsedLimit = parseInt(limitStr as string, 10);
+    if (Number.isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
+      return { error: "limit must be a positive integer between 1 and 100" };
+    }
+    limit = parsedLimit;
+  }
+
+  return { page, limit };
+}
+
 // GET /approvals
 router.get("/approvals", async (req: Request, res: Response): Promise<void> => {
   try {
-    const page = req.query?.page ? parseInt(req.query.page as string) : undefined;
-    const limit = req.query?.limit ? parseInt(req.query.limit as string) : undefined;
+    const { page, limit, error } = parsePaginationParams(req);
+    if (error) {
+      res.status(400).json({ error });
+      return;
+    }
 
     if (page !== undefined || limit !== undefined) {
       const p = page || 1;
@@ -313,8 +342,11 @@ router.get("/approvals", async (req: Request, res: Response): Promise<void> => {
 // GET /logs
 router.get("/logs", async (req: Request, res: Response): Promise<void> => {
   try {
-    const page = req.query?.page ? parseInt(req.query.page as string) : undefined;
-    const limit = req.query?.limit ? parseInt(req.query.limit as string) : undefined;
+    const { page, limit, error } = parsePaginationParams(req);
+    if (error) {
+      res.status(400).json({ error });
+      return;
+    }
 
     if (page !== undefined || limit !== undefined) {
       const p = page || 1;

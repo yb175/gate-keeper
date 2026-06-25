@@ -4,8 +4,32 @@ import { Memory, Tool, ToolCall, FinalAnswer, AgentStep } from "../../types.js";
 export const llmClient = {
   async callModel(prompt: string): Promise<string> {
     if (process.env.MOCK_LLM === "true") {
-      if (prompt.includes("sandbox/test.txt")) {
-        if (prompt.includes("TOOL: ") || prompt.includes("\ntool: ")) {
+      const lines = prompt.split("\n");
+      let lastUserIndex = -1;
+      let hasToolAfterUser = false;
+      let lastUserLine = "";
+
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i]?.trim() || "";
+        if (line.startsWith("USER:")) {
+          lastUserIndex = i;
+          lastUserLine = line;
+          break;
+        }
+      }
+
+      if (lastUserIndex !== -1) {
+        for (let i = lastUserIndex + 1; i < lines.length; i++) {
+          const line = lines[i]?.trim() || "";
+          if (line.startsWith("TOOL:") || line.startsWith("tool:")) {
+            hasToolAfterUser = true;
+            break;
+          }
+        }
+      }
+
+      if (lastUserLine.includes("sandbox/test.txt")) {
+        if (hasToolAfterUser) {
           return JSON.stringify({
             type: "final_answer",
             answer: "Successfully wrote sandbox/test.txt"
@@ -20,8 +44,9 @@ export const llmClient = {
           }
         });
       }
-      if (prompt.includes("sandbox/allowed.txt")) {
-        if (prompt.includes("TOOL: ") || prompt.includes("\ntool: ")) {
+
+      if (lastUserLine.includes("sandbox/allowed.txt")) {
+        if (hasToolAfterUser) {
           return JSON.stringify({
             type: "final_answer",
             answer: "Successfully wrote sandbox/allowed.txt"
@@ -36,6 +61,7 @@ export const llmClient = {
           }
         });
       }
+
       return JSON.stringify({
         type: "final_answer",
         answer: "Mock response."

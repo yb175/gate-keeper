@@ -77,6 +77,11 @@ export async function decide(
                 where: { id: approval.id },
               });
             } catch (err: any) {
+              if (err.code === "P2025") {
+                return {
+                  decision: "ALLOW",
+                };
+              }
               await db.log.create({
                 data: {
                   tool_name: "multiple_tool_calls",

@@ -214,6 +214,7 @@ async function runVerification() {
       }
     } catch (cleanupErr) {
       console.error("  Policy cleanup failed:", cleanupErr.message);
+      hasFailed = true;
     }
 
     if (hasFailed) {
