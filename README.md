@@ -181,3 +181,10 @@ npm run test -w api
 # Run file-manager tests
 npm run test -w file-manager-mcp
 ```
+## Deployment Notes
+
+GateKeeper uses stdio-based MCP servers, SQLite persistence and Puppeteer.
+
+The complete end-to-end system is demonstrated in the attached recording.
+
+A production deployment would typically run on a VM/container environment such as GCP Compute Engine.
