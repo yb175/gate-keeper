@@ -32,7 +32,7 @@ export const llmClient = {
         if (hasToolAfterUser) {
           return JSON.stringify({
             type: "final_answer",
-            answer: "Successfully wrote sandbox/test.txt"
+            answer: "Successfully wrote sandbox/test.txt",
           });
         }
         return JSON.stringify({
@@ -40,8 +40,8 @@ export const llmClient = {
           tool_name: "write_file",
           arguments: {
             path: "sandbox/test.txt",
-            content: "Hello GateKeeper"
-          }
+            content: "Hello GateKeeper",
+          },
         });
       }
 
@@ -49,7 +49,7 @@ export const llmClient = {
         if (hasToolAfterUser) {
           return JSON.stringify({
             type: "final_answer",
-            answer: "Successfully wrote sandbox/allowed.txt"
+            answer: "Successfully wrote sandbox/allowed.txt",
           });
         }
         return JSON.stringify({
@@ -57,19 +57,19 @@ export const llmClient = {
           tool_name: "write_file",
           arguments: {
             path: "sandbox/allowed.txt",
-            content: "Auto approved content"
-          }
+            content: "Auto approved content",
+          },
         });
       }
 
       return JSON.stringify({
         type: "final_answer",
-        answer: "Mock response."
+        answer: "Mock response.",
       });
     }
 
     const geminiKey = process.env.GEMINI_API_KEY;
-    const grokKey = process.env.GROK_API_KEY ;
+    const grokKey = process.env.GROK_API_KEY;
 
     let timeoutMs = 30000;
     if (process.env.GEMINI_TIMEOUT_MS) {
@@ -93,20 +93,24 @@ export const llmClient = {
               "x-goog-api-key": geminiKey,
             },
             body: JSON.stringify({
-              contents: [{
-                parts: [{ text: prompt }]
-              }],
+              contents: [
+                {
+                  parts: [{ text: prompt }],
+                },
+              ],
               generationConfig: {
-                responseMimeType: "application/json"
-              }
+                responseMimeType: "application/json",
+              },
             }),
-            signal: AbortSignal.timeout(timeoutMs)
-          }
+            signal: AbortSignal.timeout(timeoutMs),
+          },
         );
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Gemini API returned status ${response.status}: ${errorText}`);
+          throw new Error(
+            `Gemini API returned status ${response.status}: ${errorText}`,
+          );
         }
 
         const json: any = await response.json();
@@ -121,10 +125,15 @@ export const llmClient = {
           throw err;
         }
         geminiError = err;
-        console.warn("Gemini API call failed, attempting fallback to Grok:", err.message);
+        console.warn(
+          "Gemini API call failed, attempting fallback to Grok:",
+          err.message,
+        );
       }
     } else {
-      geminiError = new Error("GEMINI_API_KEY environment variable is not defined");
+      geminiError = new Error(
+        "GEMINI_API_KEY environment variable is not defined",
+      );
     }
 
     // 2. Fallback to Grok (xAI API) or Groq if Gemini failed
@@ -133,32 +142,32 @@ export const llmClient = {
       const endpoint = isGroq
         ? "https://api.groq.com/openai/v1/chat/completions"
         : "https://api.x.ai/v1/chat/completions";
-      
+
       const defaultModel = isGroq ? "llama-3.3-70b-versatile" : "grok-2";
-      const model = process.env.GROK_MODEL || process.env.XAI_MODEL || defaultModel;
+      const model =
+        process.env.GROK_MODEL || process.env.XAI_MODEL || defaultModel;
       const providerName = isGroq ? "Groq" : "Grok";
 
       try {
-        const response = await fetch(
-          endpoint,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${grokKey.trim()}`,
-            },
-            body: JSON.stringify({
-              model: model,
-              messages: [{ role: "user", content: prompt }],
-              response_format: { type: "json_object" }
-            }),
-            signal: AbortSignal.timeout(timeoutMs)
-          }
-        );
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${grokKey.trim()}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" },
+          }),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`${providerName} API returned status ${response.status}: ${errorText}`);
+          throw new Error(
+            `${providerName} API returned status ${response.status}: ${errorText}`,
+          );
         }
 
         const json: any = await response.json();
@@ -166,7 +175,9 @@ export const llmClient = {
         if (json.choices) {
           const text = json.choices?.[0]?.message?.content;
           if (!text) {
-            throw new Error(`Invalid response received from ${providerName} API`);
+            throw new Error(
+              `Invalid response received from ${providerName} API`,
+            );
           }
           return text;
         } else if (json.candidates) {
@@ -176,14 +187,16 @@ export const llmClient = {
           }
           return text;
         } else {
-          throw new Error(`Unknown response format received from ${providerName} API`);
+          throw new Error(
+            `Unknown response format received from ${providerName} API`,
+          );
         }
       } catch (err: any) {
         console.error(`${providerName} fallback API call failed:`, err.message);
         throw new Error(
           `Security Agent Service Error: Both primary (Gemini) and fallback (${providerName}) models failed to respond.\n` +
-          `• Gemini Error: ${geminiError.message}\n` +
-          `• ${providerName} Error: ${err.message}`
+            `• Gemini Error: ${geminiError.message}\n` +
+            `• ${providerName} Error: ${err.message}`,
         );
       }
     }
@@ -191,9 +204,9 @@ export const llmClient = {
     // 3. Display user-friendly message if both failed or fallback API key is missing
     throw new Error(
       `Security Agent Service Error: Primary model (Gemini) failed to respond, and no fallback model is configured.\n` +
-      `• Gemini Error: ${geminiError.message}`
+        `• Gemini Error: ${geminiError.message}`,
     );
-  }
+  },
 };
 
 export function validateSchema(schema: any, data: any): boolean {
@@ -254,13 +267,19 @@ export function validateSchema(schema: any, data: any): boolean {
   return true;
 }
 
-export async function nextStep(memory: Memory, tools: Tool[]): Promise<{ step: AgentStep; tokens: number }> {
+export async function nextStep(
+  memory: Memory,
+  tools: Tool[],
+): Promise<{ step: AgentStep; tokens: number }> {
   const messagesContext = memory.messages
-    .map(msg => `${msg.role.toUpperCase()}: ${msg.content}`)
+    .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)
     .join("\n");
 
   const toolsContext = tools
-    .map(t => `- Name: ${t.name}\n  Description: ${t.description}\n  Schema: ${JSON.stringify(t.inputSchema)}`)
+    .map(
+      (t) =>
+        `- Name: ${t.name}\n  Description: ${t.description}\n  Schema: ${JSON.stringify(t.inputSchema)}`,
+    )
     .join("\n\n");
 
   const prompt = `
@@ -297,7 +316,8 @@ If you are done and have a final answer, output:
   const rawResponse = await llmClient.callModel(prompt);
 
   // Estimate token usage (standard 4 characters per token average)
-  const tokens = Math.ceil(prompt.length / 4) + Math.ceil(rawResponse.length / 4);
+  const tokens =
+    Math.ceil(prompt.length / 4) + Math.ceil(rawResponse.length / 4);
 
   let parsed: any;
   try {
@@ -312,11 +332,16 @@ If you are done and have a final answer, output:
 
   if (parsed.type === "tool_call") {
     const { tool_name, arguments: args } = parsed;
-    if (typeof tool_name !== "string" || !args || typeof args !== "object" || Array.isArray(args)) {
+    if (
+      typeof tool_name !== "string" ||
+      !args ||
+      typeof args !== "object" ||
+      Array.isArray(args)
+    ) {
       throw new Error("Invalid LLM output structure for tool call");
     }
 
-    const tool = tools.find(t => t.name === tool_name);
+    const tool = tools.find((t) => t.name === tool_name);
     if (!tool) {
       throw new Error(`Unknown tool: ${tool_name}`);
     }
@@ -329,9 +354,9 @@ If you are done and have a final answer, output:
       step: {
         type: "tool_call",
         tool_name,
-        arguments: args
+        arguments: args,
       },
-      tokens
+      tokens,
     };
   } else if (parsed.type === "tool_calls") {
     const { tool_calls } = parsed;
@@ -339,15 +364,24 @@ If you are done and have a final answer, output:
       throw new Error("Invalid LLM output structure for parallel tool calls");
     }
     if (tool_calls.length === 0) {
-      throw new Error("LLM returned an empty tool_calls array; at least one tool is required");
+      throw new Error(
+        "LLM returned an empty tool_calls array; at least one tool is required",
+      );
     }
 
     for (const tc of tool_calls) {
-      if (!tc || typeof tc !== "object" || typeof tc.tool_name !== "string" || !tc.arguments || typeof tc.arguments !== "object" || Array.isArray(tc.arguments)) {
+      if (
+        !tc ||
+        typeof tc !== "object" ||
+        typeof tc.tool_name !== "string" ||
+        !tc.arguments ||
+        typeof tc.arguments !== "object" ||
+        Array.isArray(tc.arguments)
+      ) {
         throw new Error("Invalid tool call in parallel list");
       }
 
-      const tool = tools.find(t => t.name === tc.tool_name);
+      const tool = tools.find((t) => t.name === tc.tool_name);
       if (!tool) {
         throw new Error(`Unknown tool: ${tc.tool_name}`);
       }
@@ -360,12 +394,12 @@ If you are done and have a final answer, output:
     return {
       step: {
         type: "tool_calls",
-        tool_calls: tool_calls.map(tc => ({
+        tool_calls: tool_calls.map((tc) => ({
           tool_name: tc.tool_name,
-          arguments: tc.arguments
-        }))
+          arguments: tc.arguments,
+        })),
       },
-      tokens
+      tokens,
     };
   } else if (parsed.type === "final_answer") {
     const { answer } = parsed;
@@ -376,9 +410,9 @@ If you are done and have a final answer, output:
     return {
       step: {
         type: "final_answer",
-        answer
+        answer,
       },
-      tokens
+      tokens,
     };
   } else {
     throw new Error("Invalid LLM output structure: missing or invalid type");

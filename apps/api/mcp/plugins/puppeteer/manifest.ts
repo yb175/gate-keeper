@@ -5,5 +5,5 @@ export const puppeteerPlugin = new StdioMCPServer(
   "puppeteer",
   "npx",
   ["-y", "@modelcontextprotocol/server-puppeteer"],
-  {}
+  {},
 );

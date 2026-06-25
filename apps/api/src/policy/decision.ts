@@ -28,7 +28,10 @@ export async function decide(
             },
           });
         } catch (logErr) {
-          console.error("Failed to write denial log for invalid parallel args:", logErr);
+          console.error(
+            "Failed to write denial log for invalid parallel args:",
+            logErr,
+          );
         }
         return {
           decision: "DENY",
@@ -102,7 +105,10 @@ export async function decide(
                   reason: `Conversation: ${conversation.conversationId} | Could not delete approval record, aborting to prevent replay (ID: ${approval.id})`,
                 },
               });
-              return { decision: "DENY", reason: "Approval record deletion failed" };
+              return {
+                decision: "DENY",
+                reason: "Approval record deletion failed",
+              };
             }
             // Log ALLOW for each individual tool call only after confirmed deletion
             for (const tc of toolCalls) {
@@ -127,7 +133,10 @@ export async function decide(
                 where: { id: approval.id },
               });
             } catch (err: any) {
-              console.error("Failed to delete approval on parallel rejected resume:", err);
+              console.error(
+                "Failed to delete approval on parallel rejected resume:",
+                err,
+              );
             }
             for (const tc of toolCalls) {
               await db.log.create({
@@ -284,7 +293,10 @@ export async function decide(
                 reason: `Conversation: ${conversation.conversationId} | Could not delete approval record, aborting to prevent replay (ID: ${approval.id})`,
               },
             });
-            return { decision: "DENY", reason: "Approval record deletion failed" };
+            return {
+              decision: "DENY",
+              reason: "Approval record deletion failed",
+            };
           }
 
           await db.log.create({

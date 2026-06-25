@@ -1,162 +1,183 @@
-# Turborepo starter
+# Gatekeeper
 
-This Turborepo starter is maintained by the Turborepo core team.
+Gatekeeper is a safety layer for LLM agents. When an agent decides to call a tool (like reading, writing, or deleting a file), Gatekeeper intercepts that call and checks it against active policy rules—such as directory sandboxing, token budgets, and human-in-the-loop approvals—before letting it execute.
 
-## Using this example
+The repository is structured as a monorepo containing a Next.js frontend, an Express API backend (which manages the LLM agent and policy engine), and a custom Model Context Protocol (MCP) server for file system operations.
 
-Run the following command:
+## DEMO
+[![Gatekeeper Overview Video](https://img.youtube.com/vi/wyeKKbvEvQM/maxresdefault.jpg)](https://youtu.be/wyeKKbvEvQM)
 
-```sh
-npx create-turbo@latest
+---
+
+## Architecture Overview
+
+Here is how the frontend, backend, and MCP servers communicate:
+
+![System Architecture](./static/system_architecture.png)
+
+1. **Frontend ([apps/web](file:///home/yb175/projects/gate-keeper/apps/web))**: A Next.js dashboard providing a chat interface, policy management panel, approval queue, and audit logs.
+2. **Backend ([apps/api](file:///home/yb175/projects/gate-keeper/apps/api))**: An Express server running the LLM agent loop (supporting Gemini 2.5 Flash and Grok), the policy engine, and the MCP client.
+3. **MCP Servers**: Subprocesses spawned by the backend over Stdio. This includes a custom [file-manager-mcp](file:///home/yb175/projects/gate-keeper/apps/file-manager-mcp) for safe file operations, and external servers like `@upstash/context7-mcp` (for fetching documentation) and `@modelcontextprotocol/server-puppeteer` (for web browsing).
+
+---
+
+## Core Execution Flow
+
+The system runs on an interception and evaluation loop. Here is the actual flow:
+
+![Detailed Flow](./static/detailed_flow.png)
+
+Below is the step-by-step block diagram of the workflow:
+
+```
+                  ┌──────────────────────────────────────────────┐
+                  │                 USER / CLIENT                │
+                  └──────────────┬────────────────────────▲──────┘
+                                 │                        │
+                   (User Prompt) │                        │ (Response)
+                                 ▼                        │
+                  ┌───────────────────────────────────────┴──────┐
+                  │                  LLM AGENT                   │ ◄───────────────────────────┐
+                  │           (Gemini / Grok Loop)               │                             │
+                  └──────────────┬───────────────────────────────┘                             │
+                                 │                                                             │
+                  (Generates Tool│ Call: e.g. "deleteFile")                                    │
+                                 ▼                                                             │
+                  ┌──────────────────────────────────────────────┐                             │
+                  │                POLICY ENGINE                 │                             │
+                  │   Evaluates:                                 │                             │
+                  │   - Block Check (block.ts)                   │                             │
+                  │   - Sandbox Path Check (pathRule.ts)         │                             │
+                  │   - Token Budget Check (budget.ts)           │                             │
+                  │   - Manual Approval Check (approval.ts)      │                             │
+                  └──────────────┬───────────────────────────────┘                             │
+                                 │                                                             │
+                                 ▼                                                             │
+                   [ Evaluates Decision Outcome ]                                              │
+                    /            │            \                                                │
+                   /             │             \                                               │
+           (ALLOW)               │ (DENY)       \ (PENDING)                                    │
+           /                     │               \                                             │
+          ▼                      ▼                ▼                                            │
+  ┌───────────────┐      ┌───────────────┐   ┌────────────────────────┐                        │
+  │ MCP Registry  │      │ Write Audit   │   │ Create DB Approval     │                        │
+  │ & Exec Client │      │ Log to DB     │   └───────────┬────────────┘                        │
+  └───────┬───────┘      └───────┬───────┘               │                                     │
+          │                      │                       ▼                                     │
+          ▼                      ▼               ┌────────────────────────┐                    │
+  ┌───────────────┐      ┌───────────────┐       │ Show in Admin Panel    │                    │
+  │ Execute Tool  │      │ Return Error  │       │ (Awaiting User Action) │                    │
+  │ on MCP Server │      │ to LLM Agent  ├──────►└───────────┬────────────┘                    │
+  └───────┬───────┘      └───────┬───────┘                   │                                 │
+          │                      │                           │                                 │
+          ▼                      │                           ▼                                 │
+  ┌───────────────┐              │                  [ User Decides ]                           │
+  │ Return Output │              │                   /            \                            │
+  │ to LLM Agent  ├──────────────┘                  /              \                           │
+  └───────────────┘                          (Approve)             (Reject)                    │
+                                               /                      \                        │
+                                              ▼                        ▼                       │
+                                      ┌───────────────┐        ┌───────────────┐               │
+                                      │ Update status │        │ Update status │               │
+                                      │ to APPROVED   │        │ to REJECTED   │               │
+                                      └───────┬───────┘        └───────┬───────┘               │
+                                              │                        │                       │
+                                              ▼                        ▼                       │
+                                      ┌───────────────┐        ┌───────────────┐               │
+                                      │ Resume Agent  │        │ Resume Agent  │               │
+                                      │ Loop with     │        │ Loop and      │               │
+                                      │ Tool Allowed  │        │ Deny Tool     │               │
+                                      └───────┬───────┘        └───────┬───────┘               │
+                                              │                        │                       │
+                                              └────────────────────────┴───────────────────────┘
 ```
 
-## What's inside?
+### Decision States
 
-This Turborepo includes the following packages/apps:
+- **`ALLOW`**: The tool runs immediately. The MCP client performs the operation and returns the outcome to the LLM agent.
+- **`DENY`**: The tool is blocked. A denial log is written to the database, and the error is returned to the agent.
+- **`PENDING`**: Execution is suspended. The engine writes an approval record to the SQLite database and pauses the loop. Once a user clicks **Approve** or **Reject** in the frontend UI, the backend resumes the loop to process the tool call.
 
-### Apps and Packages
+## Monorepo Codebase Breakdown
 
-- `apps/api`: Express API server managing MCP server registrations, tool executions, logging, and policy evaluations.
-- `apps/web`: Next.js web application interface.
-- `apps/file-manager-mcp`: Custom Model Context Protocol (MCP) server providing secure sandboxed filesystem operations.
-- `packages/db` ([@repo/db](./packages/db/README.md)): Prisma database library managing schemas, migrations, and SQLite instance. (See the [Schema Architecture Documentation](./packages/db/README.md)).
-- `packages/shared` ([@repo/shared](./packages/shared)): Shared utility functions and formatting helpers.
-- `packages/ui` ([@repo/ui](./packages/ui)): React UI components shared by the applications.
-- `packages/eslint-config` ([@repo/eslint-config](./packages/eslint-config)): Monorepo ESLint configurations.
-- `packages/typescript-config` ([@repo/typescript-config](./packages/typescript-config)): TSConfig setups.
+- **[apps/api](file:///home/yb175/projects/gate-keeper/apps/api)**:
+  - [src/index.ts](file:///home/yb175/projects/gate-keeper/apps/api/src/index.ts) - The Express app entry point.
+  - [src/agent/loop.ts](file:///home/yb175/projects/gate-keeper/apps/api/src/agent/loop.ts) - The execution loop managing LLM calls, step generation, and policy enforcement.
+  - [src/policy/decision.ts](file:///home/yb175/projects/gate-keeper/apps/api/src/policy/decision.ts) - Orchestrates the database check, logging, and state management for approvals.
+  - [src/policy/engine.ts](file:///home/yb175/projects/gate-keeper/apps/api/src/policy/engine.ts) - Runs the pipeline of rule checks (Block -> Path Sandbox -> Budget -> Approval).
+  - [mcp/bootstrap.ts](file:///home/yb175/projects/gate-keeper/apps/api/mcp/bootstrap.ts) - Spawns and manages standard input/output connections to MCP servers.
+- **[apps/web](file:///home/yb175/projects/gate-keeper/apps/web)**:
+  - [app/chat/page.tsx](file:///home/yb175/projects/gate-keeper/apps/web/app/chat/page.tsx) - Next.js chat interface to talk with the agent.
+  - [app/approvals/page.tsx](file:///home/yb175/projects/gate-keeper/apps/web/app/approvals/page.tsx) - Interactive queue to approve or reject pending tool calls.
+  - [app/policies/page.tsx](file:///home/yb175/projects/gate-keeper/apps/web/app/policies/page.tsx) - Form to configure path rules, block lists, and approvals for each tool.
+- **[apps/file-manager-mcp](file:///home/yb175/projects/gate-keeper/apps/file-manager-mcp)**:
+  - [src/tools/](file:///home/yb175/projects/gate-keeper/apps/file-manager-mcp/src/tools) - The safe filesystem tools: `deleteFile`, `listFiles`, `moveFile`, `readFile`, and `writeFile`.
+- **[packages/db](file:///home/yb175/projects/gate-keeper/packages/db)**:
+  - [prisma/schema.prisma](file:///home/yb175/projects/gate-keeper/packages/db/prisma/schema.prisma) - Prisma schema using SQLite. Stores audit logs, policies, pending approvals, and token budget conversation sessions.
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+---
 
-### Utilities
+## How to Start the Project
 
-This Turborepo has some additional tools already setup for you:
+Follow these steps to set up and run the application locally.
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+### 1. Install Dependencies
 
-### Build
+Ensure you have Node.js (>= 18) installed, then run the following in the project root:
 
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```bash
+npm install
 ```
 
-Without global `turbo`, use your package manager:
+### 2. Configure Environment Variables
 
-```sh
-cd my-turborepo
-npx turbo build
-npm dlx turbo build
-npm exec turbo build
+Copy the sample environment file and fill in your keys:
+
+```bash
+cp .env.sample .env
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Open [.env](file:///home/yb175/projects/gate-keeper/.env) and populate the following keys:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+- `GEMINI_API_KEY`: API key for Gemini 2.5 Flash.
+- `GROK_API_KEY`: Fallback xAI Grok API key.
+- `CONTEXT7_API_KEY`: (Optional) Upstash context7 API key for documentation querying.
+- Or set `MOCK_LLM=true` to test the agent loop offline with mock responses.
 
-```sh
-turbo build --filter=docs
+### 3. Initialize the SQLite Database
+
+Run Prisma migrations to set up the database tables:
+
+```bash
+npm run db:generate -w @repo/db
+npm run db:push -w @repo/db
 ```
 
-Without global `turbo`:
+> [!NOTE]
+> **Why SQLite?**
+> SQLite is intentionally chosen for this proof-of-concept to keep local setup, testing, and portability simple with zero configuration. For a production deployment with high concurrency, PostgreSQL is recommended and can be easily swapped in via Prisma.
 
-```sh
-npx turbo build --filter=docs
-npm exec turbo build --filter=docs
-npm exec turbo build --filter=docs
+### 4. Run the Dev Servers
+
+Start the frontend, backend, and build watcher concurrently:
+
+```bash
+npm run dev
 ```
 
-### Develop
+Once started, you can access the application at:
 
-To develop all apps and packages, run the following command:
+- **Frontend**: [http://localhost:3000](http://localhost:3000)
+- **Backend API**: [http://localhost:3001](http://localhost:3001)
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+### 5. Running Tests
 
-```sh
-cd my-turborepo
-turbo dev
+You can run vitest suites to verify all rules and server communication:
+
+```bash
+# Run backend API tests
+npm run test -w api
+
+# Run file-manager tests
+npm run test -w file-manager-mcp
 ```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-npm exec turbo dev
-npm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-npm exec turbo dev --filter=web
-npm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-npm exec turbo login
-npm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-npm exec turbo link
-npm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)

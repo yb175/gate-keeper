@@ -9,8 +9,11 @@ interface LogsTableProps {
   onResetLogs: () => Promise<void>;
 }
 
-export default function LogsTable({ logs, loading, onResetLogs }: LogsTableProps) {
-  
+export default function LogsTable({
+  logs,
+  loading,
+  onResetLogs,
+}: LogsTableProps) {
   const formatDateStr = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
@@ -35,8 +38,12 @@ export default function LogsTable({ logs, loading, onResetLogs }: LogsTableProps
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <h2 className="text-lg font-mono font-bold tracking-tight text-white">Decision Logs</h2>
-          <p className="text-xs text-zinc-500">Audit trail of security decisions made by the GateKeeper engine.</p>
+          <h2 className="text-lg font-mono font-bold tracking-tight text-white">
+            Decision Logs
+          </h2>
+          <p className="text-xs text-zinc-500">
+            Audit trail of security decisions made by the GateKeeper engine.
+          </p>
         </div>
         <button
           onClick={onResetLogs}
@@ -81,32 +88,49 @@ export default function LogsTable({ logs, loading, onResetLogs }: LogsTableProps
                 ))
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-zinc-500 font-mono">
+                  <td
+                    colSpan={5}
+                    className="px-4 py-8 text-center text-zinc-500 font-mono"
+                  >
                     No logs found.
                   </td>
                 </tr>
               ) : (
                 logs.map((log) => {
-                  const { conversationId, reasonText } = parseLogReason(log.reason);
+                  const { conversationId, reasonText } = parseLogReason(
+                    log.reason,
+                  );
                   return (
-                    <tr key={log.id} className="hover:bg-zinc-900/30 transition-colors">
-                      <td className="px-4 py-3 text-zinc-500">{formatDateStr(log.createdAt)}</td>
-                      <td className="px-4 py-3 text-zinc-400 font-medium">{conversationId}</td>
-                      <td className="px-4 py-3 text-zinc-200">{log.tool_name}</td>
+                    <tr
+                      key={log.id}
+                      className="hover:bg-zinc-900/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-zinc-500">
+                        {formatDateStr(log.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-400 font-medium">
+                        {conversationId}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-200">
+                        {log.tool_name}
+                      </td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold ${
                             log.decision === "ALLOW"
                               ? "bg-green-500/10 text-green-400 border border-green-500/20"
                               : log.decision === "DENY"
-                              ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                           }`}
                         >
                           {log.decision}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-zinc-400 max-w-xs truncate" title={reasonText}>
+                      <td
+                        className="px-4 py-3 text-zinc-400 max-w-xs truncate"
+                        title={reasonText}
+                      >
                         {reasonText}
                       </td>
                     </tr>

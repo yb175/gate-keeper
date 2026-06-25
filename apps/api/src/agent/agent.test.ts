@@ -65,7 +65,7 @@ describe("Agent Module & Execution Loop", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     vi.mocked(db.conversation.findUnique).mockResolvedValue({
       id: "conv-1",
       tokens_used: 0,
@@ -75,7 +75,7 @@ describe("Agent Module & Execution Loop", () => {
     } as any);
     vi.mocked(db.conversation.update).mockResolvedValue({} as any);
     vi.mocked(db.conversation.upsert).mockResolvedValue({} as any);
-    
+
     // Default discovery stub returning the test tool
     const mockToolsMap = new Map();
     mockToolsMap.set("test_tool", {
@@ -96,9 +96,9 @@ describe("Agent Module & Execution Loop", () => {
         type: "tool_call",
         tool_name: "test_tool",
         arguments: { arg1: "hello" },
-      })
+      }),
     );
-    
+
     vi.mocked(decide).mockResolvedValue({
       decision: "PENDING",
       reason: "approval-uuid-1",
@@ -112,7 +112,7 @@ describe("Agent Module & Execution Loop", () => {
         tool_name: "test_tool",
         arguments: { arg1: "hello" },
       }),
-      { conversationId: "conv-1", token: expect.any(Number) }
+      { conversationId: "conv-1", token: expect.any(Number) },
     );
   });
 
@@ -122,7 +122,7 @@ describe("Agent Module & Execution Loop", () => {
       JSON.stringify({
         type: "final_answer",
         answer: "Task completed successfully.",
-      })
+      }),
     );
 
     const result = await runAgent("Perform task", "conv-1");
@@ -141,7 +141,7 @@ describe("Agent Module & Execution Loop", () => {
         type: "tool_call",
         tool_name: "test_tool",
         arguments: { arg1: "value" },
-      })
+      }),
     );
 
     vi.mocked(decide).mockResolvedValue({
@@ -162,7 +162,7 @@ describe("Agent Module & Execution Loop", () => {
         type: "tool_call",
         tool_name: "test_tool",
         arguments: { arg1: "forbidden" },
-      })
+      }),
     );
 
     vi.mocked(decide).mockResolvedValue({
@@ -207,7 +207,7 @@ describe("Agent Module & Execution Loop", () => {
     expect(mcpExecutor.execute).toHaveBeenCalledWith(
       "test_tool",
       { arg1: "valid-input" },
-      { conversationId: "conv-4", decision: "ALLOW" }
+      { conversationId: "conv-4", decision: "ALLOW" },
     );
     expect(result.memory.toolResults).toContain("Success output");
   });
@@ -219,11 +219,11 @@ describe("Agent Module & Execution Loop", () => {
         type: "tool_call",
         tool_name: "test_tool",
         arguments: { arg1: 12345 }, // arg1 must be string
-      })
+      }),
     );
 
     await expect(runAgent("Run action", "conv-5")).rejects.toThrow(
-      "Invalid arguments for tool test_tool"
+      "Invalid arguments for tool test_tool",
     );
   });
 
@@ -233,11 +233,11 @@ describe("Agent Module & Execution Loop", () => {
         type: "tool_call",
         tool_name: "unknown_tool",
         arguments: {},
-      })
+      }),
     );
 
     await expect(runAgent("Run action", "conv-5")).rejects.toThrow(
-      "Unknown tool: unknown_tool"
+      "Unknown tool: unknown_tool",
     );
   });
 
@@ -248,17 +248,19 @@ describe("Agent Module & Execution Loop", () => {
         type: "tool_call",
         tool_name: "test_tool",
         arguments: { arg1: "trigger-fail" },
-      })
+      }),
     );
 
     vi.mocked(decide).mockResolvedValue({
       decision: "ALLOW",
     });
 
-    vi.mocked(mcpExecutor.execute).mockRejectedValue(new Error("Executor crash"));
+    vi.mocked(mcpExecutor.execute).mockRejectedValue(
+      new Error("Executor crash"),
+    );
 
     await expect(runAgent("Fail task", "conv-6")).rejects.toThrow(
-      "Tool execution failed: Executor crash"
+      "Tool execution failed: Executor crash",
     );
   });
 
@@ -267,7 +269,7 @@ describe("Agent Module & Execution Loop", () => {
     vi.spyOn(llmClient, "callModel").mockResolvedValue("not-json-format");
 
     await expect(runAgent("Fail task", "conv-7")).rejects.toThrow(
-      "Malformed JSON from LLM response"
+      "Malformed JSON from LLM response",
     );
   });
 
@@ -288,14 +290,16 @@ describe("Agent Module & Execution Loop", () => {
       decision: "ALLOW",
     });
 
-    vi.mocked(mcpExecutor.execute).mockResolvedValue("Resumed execution success");
+    vi.mocked(mcpExecutor.execute).mockResolvedValue(
+      "Resumed execution success",
+    );
 
     // The model is only called once after the executor finishes to retrieve the final answer
     vi.spyOn(llmClient, "callModel").mockResolvedValue(
       JSON.stringify({
         type: "final_answer",
         answer: "Completed resumed action.",
-      })
+      }),
     );
 
     const memory = createMemory();
@@ -317,12 +321,12 @@ describe("Agent Module & Execution Loop", () => {
         arguments: { arg1: "resumed-val" },
         approvalId: "approval-999",
       }),
-      { conversationId: "conv-8", token: 0 }
+      { conversationId: "conv-8", token: 0 },
     );
     expect(mcpExecutor.execute).toHaveBeenCalledWith(
       "test_tool",
       { arg1: "resumed-val" },
-      { conversationId: "conv-8", decision: "ALLOW" }
+      { conversationId: "conv-8", decision: "ALLOW" },
     );
     expect(result.memory.toolResults).toContain("Resumed execution success");
   });
@@ -335,9 +339,9 @@ describe("Agent Module & Execution Loop", () => {
         type: "tool_call",
         tool_name: "test_tool",
         arguments: { arg1: "looping" },
-      })
+      }),
     );
-    
+
     vi.mocked(decide).mockResolvedValue({
       decision: "ALLOW",
     });
@@ -345,7 +349,7 @@ describe("Agent Module & Execution Loop", () => {
     vi.mocked(mcpExecutor.execute).mockResolvedValue("Executed ok");
 
     await expect(runAgent("Loop forever", "conv-9")).rejects.toThrow(
-      "Agent loop iteration limit exceeded"
+      "Agent loop iteration limit exceeded",
     );
   });
 
@@ -355,7 +359,7 @@ describe("Agent Module & Execution Loop", () => {
       JSON.stringify({
         type: "final_answer",
         answer: "Finished",
-      })
+      }),
     );
 
     // Mock upsert to return a conversation that was reset 4 minutes ago
@@ -377,7 +381,7 @@ describe("Agent Module & Execution Loop", () => {
           tokens_used: 0,
           budget_reset_at: expect.any(Date),
         }),
-      })
+      }),
     );
   });
 
@@ -433,9 +437,9 @@ describe("Agent Module & Execution Loop", () => {
           type: "tool_calls",
           tool_calls: [
             { tool_name: "test_tool", arguments: { arg1: "val1" } },
-            { tool_name: "test_tool", arguments: { arg1: "val2" } }
-          ]
-        })
+            { tool_name: "test_tool", arguments: { arg1: "val2" } },
+          ],
+        }),
       );
 
       const memory = createMemory();
@@ -443,9 +447,12 @@ describe("Agent Module & Execution Loop", () => {
         {
           name: "test_tool",
           description: "A test tool",
-          inputSchema: { type: "object", properties: { arg1: { type: "string" } } },
+          inputSchema: {
+            type: "object",
+            properties: { arg1: { type: "string" } },
+          },
           execute: vi.fn(),
-        }
+        },
       ];
 
       const res = await nextStep(memory, tools);
@@ -465,8 +472,8 @@ describe("Agent Module & Execution Loop", () => {
             type: "tool_calls",
             tool_calls: [
               { tool_name: "test_tool", arguments: { arg1: "val1" } },
-              { tool_name: "test_tool", arguments: { arg1: "val2" } }
-            ]
+              { tool_name: "test_tool", arguments: { arg1: "val2" } },
+            ],
           });
         }
         return JSON.stringify({
@@ -492,10 +499,8 @@ describe("Agent Module & Execution Loop", () => {
       vi.spyOn(llmClient, "callModel").mockResolvedValue(
         JSON.stringify({
           type: "tool_calls",
-          tool_calls: [
-            { tool_name: "test_tool", arguments: { arg1: "val1" } }
-          ]
-        })
+          tool_calls: [{ tool_name: "test_tool", arguments: { arg1: "val1" } }],
+        }),
       );
 
       vi.mocked(decide).mockResolvedValue({
@@ -503,7 +508,10 @@ describe("Agent Module & Execution Loop", () => {
         reason: "approval-parallel-123",
       });
 
-      const result = await runAgent("Do parallel task requiring approval", "conv-parallel-2");
+      const result = await runAgent(
+        "Do parallel task requiring approval",
+        "conv-parallel-2",
+      );
       expect(result.status).toBe("PENDING");
       expect(result.approvalId).toBe("approval-parallel-123");
       expect(result.memory.approvalId).toBe("approval-parallel-123");
@@ -522,7 +530,9 @@ describe("Agent Module & Execution Loop", () => {
         await new Promise((_, reject) => {
           if (init?.signal) {
             init.signal.addEventListener("abort", () => {
-              reject(new DOMException("The operation was aborted.", "AbortError"));
+              reject(
+                new DOMException("The operation was aborted.", "AbortError"),
+              );
             });
           }
         });
@@ -532,7 +542,9 @@ describe("Agent Module & Execution Loop", () => {
       process.env.GEMINI_API_KEY = "dummy-key";
       process.env.GEMINI_TIMEOUT_MS = "50"; // 50ms timeout for test speed
 
-      await expect(llmClient.callModel("Hello")).rejects.toThrow("The operation was aborted");
+      await expect(llmClient.callModel("Hello")).rejects.toThrow(
+        "The operation was aborted",
+      );
     });
 
     it("should fall back to default timeout and execute normally if env timeout is invalid", async () => {
@@ -541,10 +553,12 @@ describe("Agent Module & Execution Loop", () => {
         return {
           ok: true,
           json: async () => ({
-            candidates: [{
-              content: { parts: [{ text: "response-ok" }] }
-            }]
-          })
+            candidates: [
+              {
+                content: { parts: [{ text: "response-ok" }] },
+              },
+            ],
+          }),
         } as any;
       });
 

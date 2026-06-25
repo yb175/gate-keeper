@@ -27,7 +27,6 @@ const chatSlice = createSlice({
   name: "chat",
   initialState,
   reducers: {
-
     setMessages(state, action: PayloadAction<ChatMessage[]>) {
       state.messages = action.payload;
     },
@@ -42,11 +41,16 @@ const chatSlice = createSlice({
     },
     setPendingApproval(
       state,
-      action: PayloadAction<{ id: string | null; toolName: string | null; status?: "PENDING" | "APPROVED" | "REJECTED" | null }>
+      action: PayloadAction<{
+        id: string | null;
+        toolName: string | null;
+        status?: "PENDING" | "APPROVED" | "REJECTED" | null;
+      }>,
     ) {
       state.pendingApprovalId = action.payload.id;
       state.pendingToolName = action.payload.toolName;
-      state.pendingApprovalStatus = action.payload.status || (action.payload.id ? "PENDING" : null);
+      state.pendingApprovalStatus =
+        action.payload.status || (action.payload.id ? "PENDING" : null);
     },
     hydrateChatState(
       state,
@@ -56,7 +60,7 @@ const chatSlice = createSlice({
         pendingApprovalId: string | null;
         pendingToolName: string | null;
         pendingApprovalStatus: "PENDING" | "APPROVED" | "REJECTED" | null;
-      }>
+      }>,
     ) {
       state.conversationId = action.payload.conversationId;
       state.messages = action.payload.messages;
@@ -78,7 +82,6 @@ const chatSlice = createSlice({
 });
 
 export const {
-
   setMessages,
   addMessage,
   setInputValue,

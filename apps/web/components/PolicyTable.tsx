@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Edit2, Trash2, ShieldAlert, Check, AlertCircle } from "lucide-react";
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  ShieldAlert,
+  Check,
+  AlertCircle,
+} from "lucide-react";
 import { Policy, PolicyAction, McpTool } from "../services/policies";
 
 interface PolicyTableProps {
@@ -30,9 +37,12 @@ export default function PolicyTable({
   const [errorMsg, setErrorMsg] = useState("");
 
   const availableTools = mcpTools.filter(
-    (t) => !policies.some((p) => p.tool_name.trim().toLowerCase() === t.name.trim().toLowerCase())
+    (t) =>
+      !policies.some(
+        (p) => p.tool_name.trim().toLowerCase() === t.name.trim().toLowerCase(),
+      ),
   );
- 
+
   const handleOpenAdd = () => {
     setNewToolName(availableTools[0]?.name || "");
     setNewAction("APPROVAL");
@@ -40,14 +50,14 @@ export default function PolicyTable({
     setIsAddingInline(true);
     setEditingToolName(null);
   };
- 
+
   const handleStartEdit = (policy: Policy) => {
     setEditingToolName(policy.tool_name);
     setEditingAction(policy.action);
     setErrorMsg("");
     setIsAddingInline(false);
   };
- 
+
   const handleSaveEdit = async (toolName: string) => {
     setErrorMsg("");
     setActionLoading(true);
@@ -60,7 +70,7 @@ export default function PolicyTable({
       setActionLoading(false);
     }
   };
- 
+
   const handleSaveNew = async () => {
     if (!newToolName) {
       setErrorMsg("Tool name is required");
@@ -69,7 +79,9 @@ export default function PolicyTable({
     setErrorMsg("");
     setActionLoading(true);
     try {
-      const exists = policies.some((p) => p.tool_name.toLowerCase() === newToolName.trim().toLowerCase());
+      const exists = policies.some(
+        (p) => p.tool_name.toLowerCase() === newToolName.trim().toLowerCase(),
+      );
       if (exists) {
         setErrorMsg("A policy already exists for this tool name.");
         setActionLoading(false);
@@ -83,9 +95,11 @@ export default function PolicyTable({
       setActionLoading(false);
     }
   };
- 
+
   const handleDelete = async (toolName: string) => {
-    if (confirm(`Are you sure you want to delete the policy for ${toolName}?`)) {
+    if (
+      confirm(`Are you sure you want to delete the policy for ${toolName}?`)
+    ) {
       try {
         await onDeletePolicy(toolName);
       } catch (err) {
@@ -99,8 +113,12 @@ export default function PolicyTable({
       {/* Header and Add button */}
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <h2 className="text-lg font-mono font-bold tracking-tight text-white">Policies</h2>
-          <p className="text-xs text-zinc-500">Define authorization rules for incoming agent tool calls.</p>
+          <h2 className="text-lg font-mono font-bold tracking-tight text-white">
+            Policies
+          </h2>
+          <p className="text-xs text-zinc-500">
+            Define authorization rules for incoming agent tool calls.
+          </p>
         </div>
         <button
           onClick={handleOpenAdd}
@@ -110,17 +128,22 @@ export default function PolicyTable({
           <span>Add Policy</span>
         </button>
       </div>
- 
+
       {errorMsg && (
         <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-sm text-red-400 font-mono text-xs flex items-center justify-between animate-fadeIn">
           <div className="flex items-center space-x-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
-          <button onClick={() => setErrorMsg("")} className="text-red-500 hover:text-red-400 font-bold font-mono">✕</button>
+          <button
+            onClick={() => setErrorMsg("")}
+            className="text-red-500 hover:text-red-400 font-bold font-mono"
+          >
+            ✕
+          </button>
         </div>
       )}
- 
+
       {/* Table */}
       <div className="border border-zinc-800 bg-zinc-950 rounded-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -138,7 +161,9 @@ export default function PolicyTable({
                 <tr className="bg-zinc-900/50 border-b border-zinc-900">
                   <td className="px-4 py-2">
                     {availableTools.length === 0 ? (
-                      <span className="text-zinc-500 font-mono text-xs italic">All tools configured</span>
+                      <span className="text-zinc-500 font-mono text-xs italic">
+                        All tools configured
+                      </span>
                     ) : (
                       <select
                         value={newToolName}
@@ -146,7 +171,9 @@ export default function PolicyTable({
                         className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono rounded-sm text-xs focus:outline-none focus:border-zinc-500"
                       >
                         {availableTools.map((t) => (
-                          <option key={t.name} value={t.name}>{t.name}</option>
+                          <option key={t.name} value={t.name}>
+                            {t.name}
+                          </option>
                         ))}
                       </select>
                     )}
@@ -154,7 +181,9 @@ export default function PolicyTable({
                   <td className="px-4 py-2">
                     <select
                       value={newAction}
-                      onChange={(e) => setNewAction(e.target.value as PolicyAction)}
+                      onChange={(e) =>
+                        setNewAction(e.target.value as PolicyAction)
+                      }
                       className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono rounded-sm text-xs focus:outline-none focus:border-zinc-500"
                     >
                       <option value="ALLOW">ALLOW</option>
@@ -181,7 +210,7 @@ export default function PolicyTable({
                   </td>
                 </tr>
               )}
- 
+
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} className="border-b border-zinc-900/50">
@@ -201,7 +230,10 @@ export default function PolicyTable({
                 ))
               ) : policies.length === 0 && !isAddingInline ? (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-zinc-500">
+                  <td
+                    colSpan={3}
+                    className="px-4 py-8 text-center text-zinc-500"
+                  >
                     No policies defined. All tools default to APPROVAL.
                   </td>
                 </tr>
@@ -209,13 +241,20 @@ export default function PolicyTable({
                 policies.map((policy) => {
                   const isEditing = editingToolName === policy.tool_name;
                   return (
-                    <tr key={policy.tool_name} className="hover:bg-zinc-900/30 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-zinc-200">{policy.tool_name}</td>
+                    <tr
+                      key={policy.tool_name}
+                      className="hover:bg-zinc-900/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-semibold text-zinc-200">
+                        {policy.tool_name}
+                      </td>
                       <td className="px-4 py-3">
                         {isEditing ? (
                           <select
                             value={editingAction}
-                            onChange={(e) => setEditingAction(e.target.value as PolicyAction)}
+                            onChange={(e) =>
+                              setEditingAction(e.target.value as PolicyAction)
+                            }
                             className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono rounded-sm text-xs focus:outline-none focus:border-zinc-500"
                           >
                             <option value="ALLOW">ALLOW</option>
@@ -228,8 +267,8 @@ export default function PolicyTable({
                               policy.action === "ALLOW"
                                 ? "bg-green-500/10 text-green-400 border border-green-500/20"
                                 : policy.action === "DENY"
-                                ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                  ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                                  : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                             }`}
                           >
                             {policy.action}

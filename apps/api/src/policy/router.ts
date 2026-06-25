@@ -77,7 +77,11 @@ router.post("/policies", async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  if (sandbox_path !== undefined && sandbox_path !== null && typeof sandbox_path !== "string") {
+  if (
+    sandbox_path !== undefined &&
+    sandbox_path !== null &&
+    typeof sandbox_path !== "string"
+  ) {
     res.status(400).json({ error: "sandbox_path must be a string or null" });
     return;
   }
@@ -127,20 +131,29 @@ router.patch(
     const { action, sandbox_path } = req.body;
     const normalizedToolName = toolName.trim();
 
-    if (action !== undefined && !Object.values(PolicyAction).includes(action as PolicyAction)) {
+    if (
+      action !== undefined &&
+      !Object.values(PolicyAction).includes(action as PolicyAction)
+    ) {
       res.status(400).json({
         error: "Invalid action. Accepted values are ALLOW, APPROVAL, DENY",
       });
       return;
     }
 
-    if (sandbox_path !== undefined && sandbox_path !== null && typeof sandbox_path !== "string") {
+    if (
+      sandbox_path !== undefined &&
+      sandbox_path !== null &&
+      typeof sandbox_path !== "string"
+    ) {
       res.status(400).json({ error: "sandbox_path must be a string or null" });
       return;
     }
 
     if (action === undefined && sandbox_path === undefined) {
-      res.status(400).json({ error: "Either action or sandbox_path must be provided to update" });
+      res.status(400).json({
+        error: "Either action or sandbox_path must be provided to update",
+      });
       return;
     }
 
@@ -213,7 +226,7 @@ router.delete(
 async function handleApprovalStatusUpdate(
   id: string,
   targetStatus: ApprovalStatus,
-  res: Response
+  res: Response,
 ): Promise<void> {
   try {
     const updateResult = await db.approval.updateMany({
@@ -256,7 +269,7 @@ router.post(
       return;
     }
     await handleApprovalStatusUpdate(id.trim(), ApprovalStatus.APPROVED, res);
-  }
+  },
 );
 
 // POST /policies/approvals/:id/reject
@@ -269,10 +282,14 @@ router.post(
       return;
     }
     await handleApprovalStatusUpdate(id.trim(), ApprovalStatus.REJECTED, res);
-  }
+  },
 );
 
-function parsePaginationParams(req: Request): { page?: number; limit?: number; error?: string } {
+function parsePaginationParams(req: Request): {
+  page?: number;
+  limit?: number;
+  error?: string;
+} {
   const pageStr = req.query?.page;
   const limitStr = req.query?.limit;
 
@@ -281,11 +298,15 @@ function parsePaginationParams(req: Request): { page?: number; limit?: number; e
 
   if (pageStr !== undefined) {
     if (typeof pageStr !== "string" || !/^\d+$/.test(pageStr)) {
-      return { error: "page must be a positive integer greater than or equal to 1" };
+      return {
+        error: "page must be a positive integer greater than or equal to 1",
+      };
     }
     const parsedPage = parseInt(pageStr, 10);
     if (parsedPage < 1) {
-      return { error: "page must be a positive integer greater than or equal to 1" };
+      return {
+        error: "page must be a positive integer greater than or equal to 1",
+      };
     }
     page = parsedPage;
   }
@@ -330,7 +351,7 @@ router.get("/approvals", async (req: Request, res: Response): Promise<void> => {
           page: p,
           limit: l,
           pages: Math.ceil(total / l),
-        }
+        },
       });
       return;
     }
@@ -371,7 +392,7 @@ router.get("/logs", async (req: Request, res: Response): Promise<void> => {
           page: p,
           limit: l,
           pages: Math.ceil(total / l),
-        }
+        },
       });
       return;
     }

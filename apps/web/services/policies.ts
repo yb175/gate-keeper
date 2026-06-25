@@ -13,7 +13,10 @@ export async function getPolicies(): Promise<Policy[]> {
   return response.data;
 }
 
-export async function createPolicy(tool_name: string, action: PolicyAction): Promise<Policy> {
+export async function createPolicy(
+  tool_name: string,
+  action: PolicyAction,
+): Promise<Policy> {
   const response = await axios.post<Policy>(`${API_URL}/policies`, {
     tool_name,
     action,
@@ -21,10 +24,16 @@ export async function createPolicy(tool_name: string, action: PolicyAction): Pro
   return response.data;
 }
 
-export async function updatePolicy(toolName: string, action: PolicyAction): Promise<Policy> {
-  const response = await axios.patch<Policy>(`${API_URL}/policies/${encodeURIComponent(toolName)}`, {
-    action,
-  });
+export async function updatePolicy(
+  toolName: string,
+  action: PolicyAction,
+): Promise<Policy> {
+  const response = await axios.patch<Policy>(
+    `${API_URL}/policies/${encodeURIComponent(toolName)}`,
+    {
+      action,
+    },
+  );
   return response.data;
 }
 
@@ -40,6 +49,8 @@ export interface McpTool {
 }
 
 export async function getMcpTools(): Promise<McpTool[]> {
-  const response = await axios.get<{ tools: McpTool[] }>(`${API_URL}/mcp/tools`);
+  const response = await axios.get<{ tools: McpTool[] }>(
+    `${API_URL}/mcp/tools`,
+  );
   return response.data.tools;
 }

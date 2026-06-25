@@ -57,7 +57,11 @@ export default async function PolicyEngine(
     }
 
     // 2. Path Sandbox Check
-    const pathResult = await withinSandboxPath(tool_name, context.arguments, policy);
+    const pathResult = await withinSandboxPath(
+      tool_name,
+      context.arguments,
+      policy,
+    );
     if (!pathResult.success) {
       return {
         allowed: false,

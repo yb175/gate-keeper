@@ -2,7 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import ApprovalTable from "../../components/ApprovalTable";
-import { getApprovals, approveRequest, rejectRequest, Approval } from "../../services/approvals";
+import {
+  getApprovals,
+  approveRequest,
+  rejectRequest,
+  Approval,
+} from "../../services/approvals";
 
 export default function ApprovalsPage() {
   const [approvals, setApprovals] = useState<Approval[]>([]);

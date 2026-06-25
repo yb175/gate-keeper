@@ -25,7 +25,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} bg-zinc-950 text-zinc-100 min-h-screen flex flex-col antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} bg-zinc-950 text-zinc-100 min-h-screen flex flex-col antialiased`}
+      >
         <StoreProvider>
           <Navbar />
           <main className="flex-1 w-full mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">

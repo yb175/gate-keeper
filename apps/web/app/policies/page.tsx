@@ -2,7 +2,16 @@
 
 import React, { useState, useEffect } from "react";
 import PolicyTable from "../../components/PolicyTable";
-import { getPolicies, createPolicy, updatePolicy, deletePolicy, Policy, PolicyAction, getMcpTools, McpTool } from "../../services/policies";
+import {
+  getPolicies,
+  createPolicy,
+  updatePolicy,
+  deletePolicy,
+  Policy,
+  PolicyAction,
+  getMcpTools,
+  McpTool,
+} from "../../services/policies";
 
 export default function PoliciesPage() {
   const [policies, setPolicies] = useState<Policy[]>([]);

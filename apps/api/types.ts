@@ -58,7 +58,10 @@ export interface Memory {
   readonly messages: readonly Message[];
   readonly toolResults: readonly unknown[];
   approvalId?: string;
-  addMessage(role: "user" | "assistant" | "tool" | "system", content: string): void;
+  addMessage(
+    role: "user" | "assistant" | "tool" | "system",
+    content: string,
+  ): void;
   addToolResult(result: unknown): void;
   clearApproval(): void;
   setApproval(approvalId: string | undefined): void;

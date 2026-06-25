@@ -9,7 +9,9 @@ while (currentDir) {
   if (fs.existsSync(envPath)) {
     const result = dotenv.config({ path: envPath });
     if (result.error) {
-      throw new Error(`Failed to load/parse env file at ${envPath}: ${result.error.message}`);
+      throw new Error(
+        `Failed to load/parse env file at ${envPath}: ${result.error.message}`,
+      );
     }
     break;
   }

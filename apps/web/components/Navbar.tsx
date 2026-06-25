@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, MessageSquare, Key, CheckCircle, Terminal } from "lucide-react";
+import {
+  Shield,
+  MessageSquare,
+  Key,
+  CheckCircle,
+  Terminal,
+} from "lucide-react";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -21,13 +27,16 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex items-center space-x-2">
             <Shield className="h-5 w-5 text-white" />
-            <span className="font-mono font-bold tracking-tight text-white text-sm">GATEKEEPER</span>
+            <span className="font-mono font-bold tracking-tight text-white text-sm">
+              GATEKEEPER
+            </span>
           </div>
 
           {/* Navigation Links */}
           <nav className="flex space-x-1">
             {navItems.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+              const isActive =
+                pathname === item.href || pathname.startsWith(item.href + "/");
               const Icon = item.icon;
               return (
                 <Link

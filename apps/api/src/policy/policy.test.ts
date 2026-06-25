@@ -310,7 +310,9 @@ describe("Rule: withinSandboxPath", () => {
       updatedAt: new Date(),
     });
 
-    const res = await withinSandboxPath("write_file", { path: "../../etc/passwd" });
+    const res = await withinSandboxPath("write_file", {
+      path: "../../etc/passwd",
+    });
     expect(res.success).toBe(true);
     expect(res.result).toBe(false); // rule skipped — not a violation
   });
@@ -340,7 +342,9 @@ describe("Rule: withinSandboxPath", () => {
       updatedAt: new Date(),
     });
 
-    const res = await withinSandboxPath("write_file", { path: "notes/hello.txt" });
+    const res = await withinSandboxPath("write_file", {
+      path: "notes/hello.txt",
+    });
     expect(res.success).toBe(true);
     expect(res.result).toBe(false);
   });
@@ -355,7 +359,9 @@ describe("Rule: withinSandboxPath", () => {
       updatedAt: new Date(),
     });
 
-    const res = await withinSandboxPath("write_file", { path: "../../etc/passwd" });
+    const res = await withinSandboxPath("write_file", {
+      path: "../../etc/passwd",
+    });
     expect(res.success).toBe(true);
     expect(res.result).toBe(true);
     expect(res.reason).toMatch(/escapes the configured sandbox/);
@@ -388,7 +394,9 @@ describe("Rule: withinSandboxPath", () => {
     });
 
     // Agent passes "sandbox/notes/file.txt" — the prefix should be stripped
-    const res = await withinSandboxPath("write_file", { path: "sandbox/notes/file.txt" });
+    const res = await withinSandboxPath("write_file", {
+      path: "sandbox/notes/file.txt",
+    });
     expect(res.success).toBe(true);
     expect(res.result).toBe(false);
   });
@@ -448,7 +456,11 @@ describe("Rule: withinSandboxPath", () => {
       updatedAt: new Date(),
     };
 
-    const res = await withinSandboxPath("write_file", { path: "ok.txt" }, preFetched);
+    const res = await withinSandboxPath(
+      "write_file",
+      { path: "ok.txt" },
+      preFetched,
+    );
     expect(db.policy.findUnique).not.toHaveBeenCalled();
     expect(res.success).toBe(true);
     expect(res.result).toBe(false);
@@ -622,7 +634,11 @@ describe("Decision Orchestration (decide)", () => {
     });
 
     const res = await decide(
-      { tool_name: "multiple_tool_calls", arguments: { tool_calls: [{ tool_name: "test_tool", arguments: {} }] }, approvalId: "app-id-999" },
+      {
+        tool_name: "multiple_tool_calls",
+        arguments: { tool_calls: [{ tool_name: "test_tool", arguments: {} }] },
+        approvalId: "app-id-999",
+      },
       { conversationId: "conv-1", token: 5 },
     );
 
@@ -658,7 +674,13 @@ describe("Decision Orchestration (decide)", () => {
     });
 
     const res = await decide(
-      { tool_name: "multiple_tool_calls", arguments: { tool_calls: [{ tool_name: "denied_tool", arguments: {} }] }, approvalId: "app-id-999" },
+      {
+        tool_name: "multiple_tool_calls",
+        arguments: {
+          tool_calls: [{ tool_name: "denied_tool", arguments: {} }],
+        },
+        approvalId: "app-id-999",
+      },
       { conversationId: "conv-1", token: 5 },
     );
 
@@ -792,7 +814,10 @@ describe("Policy Engine REST Endpoints", () => {
 
   describe("POST /policies/approvals/:id/approve", () => {
     it("should atomically update status using updateMany and return id and status", async () => {
-      const approveHandler = getHandler("/policies/approvals/:id/approve", "POST");
+      const approveHandler = getHandler(
+        "/policies/approvals/:id/approve",
+        "POST",
+      );
       expect(approveHandler).toBeDefined();
 
       vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 1 });
@@ -813,7 +838,10 @@ describe("Policy Engine REST Endpoints", () => {
     });
 
     it("should return 404 if approval record does not exist", async () => {
-      const approveHandler = getHandler("/policies/approvals/:id/approve", "POST");
+      const approveHandler = getHandler(
+        "/policies/approvals/:id/approve",
+        "POST",
+      );
       vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
       vi.mocked(db.approval.findUnique).mockResolvedValue(null);
 
@@ -827,7 +855,10 @@ describe("Policy Engine REST Endpoints", () => {
     });
 
     it("should return 200 (idempotent) if approval status is already APPROVED", async () => {
-      const approveHandler = getHandler("/policies/approvals/:id/approve", "POST");
+      const approveHandler = getHandler(
+        "/policies/approvals/:id/approve",
+        "POST",
+      );
       vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
       vi.mocked(db.approval.findUnique).mockResolvedValue({
         id: "app-123",
@@ -839,11 +870,17 @@ describe("Policy Engine REST Endpoints", () => {
 
       await approveHandler(req, res, () => {});
 
-      expect(res.json).toHaveBeenCalledWith({ id: "app-123", status: ApprovalStatus.APPROVED });
+      expect(res.json).toHaveBeenCalledWith({
+        id: "app-123",
+        status: ApprovalStatus.APPROVED,
+      });
     });
 
     it("should return 400 if approval status is REJECTED", async () => {
-      const approveHandler = getHandler("/policies/approvals/:id/approve", "POST");
+      const approveHandler = getHandler(
+        "/policies/approvals/:id/approve",
+        "POST",
+      );
       vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
       vi.mocked(db.approval.findUnique).mockResolvedValue({
         id: "app-123",
@@ -856,13 +893,18 @@ describe("Policy Engine REST Endpoints", () => {
       await approveHandler(req, res, () => {});
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: "Approval status is not PENDING" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Approval status is not PENDING",
+      });
     });
   });
 
   describe("POST /policies/approvals/:id/reject", () => {
     it("should atomically update status using updateMany and return id and status for rejection", async () => {
-      const rejectHandler = getHandler("/policies/approvals/:id/reject", "POST");
+      const rejectHandler = getHandler(
+        "/policies/approvals/:id/reject",
+        "POST",
+      );
       expect(rejectHandler).toBeDefined();
 
       vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 1 });
@@ -883,7 +925,10 @@ describe("Policy Engine REST Endpoints", () => {
     });
 
     it("should return 404 if approval record does not exist on rejection", async () => {
-      const rejectHandler = getHandler("/policies/approvals/:id/reject", "POST");
+      const rejectHandler = getHandler(
+        "/policies/approvals/:id/reject",
+        "POST",
+      );
       vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
       vi.mocked(db.approval.findUnique).mockResolvedValue(null);
 
@@ -897,7 +942,10 @@ describe("Policy Engine REST Endpoints", () => {
     });
 
     it("should return 200 (idempotent) if approval status is already REJECTED on rejection", async () => {
-      const rejectHandler = getHandler("/policies/approvals/:id/reject", "POST");
+      const rejectHandler = getHandler(
+        "/policies/approvals/:id/reject",
+        "POST",
+      );
       vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
       vi.mocked(db.approval.findUnique).mockResolvedValue({
         id: "app-123",
@@ -909,11 +957,17 @@ describe("Policy Engine REST Endpoints", () => {
 
       await rejectHandler(req, res, () => {});
 
-      expect(res.json).toHaveBeenCalledWith({ id: "app-123", status: ApprovalStatus.REJECTED });
+      expect(res.json).toHaveBeenCalledWith({
+        id: "app-123",
+        status: ApprovalStatus.REJECTED,
+      });
     });
 
     it("should return 400 if approval status is APPROVED on rejection", async () => {
-      const rejectHandler = getHandler("/policies/approvals/:id/reject", "POST");
+      const rejectHandler = getHandler(
+        "/policies/approvals/:id/reject",
+        "POST",
+      );
       vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
       vi.mocked(db.approval.findUnique).mockResolvedValue({
         id: "app-123",
@@ -926,7 +980,9 @@ describe("Policy Engine REST Endpoints", () => {
       await rejectHandler(req, res, () => {});
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: "Approval status is not PENDING" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Approval status is not PENDING",
+      });
     });
   });
 
@@ -936,22 +992,22 @@ describe("Policy Engine REST Endpoints", () => {
       expect(getApprovals).toBeDefined();
 
       vi.mocked(db.approval.findMany).mockResolvedValue([
-        { id: "app-123", tool_name: "test_tool", status: "PENDING" }
+        { id: "app-123", tool_name: "test_tool", status: "PENDING" },
       ] as any);
 
       const req = {} as Request;
       const res = mockResponse();
 
       await getApprovals(req, res, () => {});
- 
-       expect(db.approval.findMany).toHaveBeenCalledWith({
-         orderBy: { createdAt: "desc" },
-         take: 100
-       });
-       expect(res.json).toHaveBeenCalledWith([
-         { id: "app-123", tool_name: "test_tool", status: "PENDING" }
-       ]);
-     });
+
+      expect(db.approval.findMany).toHaveBeenCalledWith({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
+      expect(res.json).toHaveBeenCalledWith([
+        { id: "app-123", tool_name: "test_tool", status: "PENDING" },
+      ]);
+    });
 
     it("should return 400 for invalid page parameter", async () => {
       const getApprovals = getHandler("/approvals", "GET");
@@ -961,7 +1017,9 @@ describe("Policy Engine REST Endpoints", () => {
       await getApprovals(req, res, () => {});
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: "page must be a positive integer greater than or equal to 1" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "page must be a positive integer greater than or equal to 1",
+      });
     });
 
     it("should return 400 for invalid limit parameter", async () => {
@@ -972,7 +1030,9 @@ describe("Policy Engine REST Endpoints", () => {
       await getApprovals(req, res, () => {});
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: "limit must be a positive integer between 1 and 100" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "limit must be a positive integer between 1 and 100",
+      });
     });
 
     it("should return 400 for suffix-malformed page parameter", async () => {
@@ -983,7 +1043,9 @@ describe("Policy Engine REST Endpoints", () => {
       await getApprovals(req, res, () => {});
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: "page must be a positive integer greater than or equal to 1" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "page must be a positive integer greater than or equal to 1",
+      });
     });
 
     it("should return 400 for suffix-malformed limit parameter", async () => {
@@ -994,31 +1056,33 @@ describe("Policy Engine REST Endpoints", () => {
       await getApprovals(req, res, () => {});
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: "limit must be a positive integer between 1 and 100" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "limit must be a positive integer between 1 and 100",
+      });
     });
-   });
- 
-   describe("GET /logs", () => {
-     it("should return a list of decision logs", async () => {
-       const getLogs = getHandler("/logs", "GET");
-       expect(getLogs).toBeDefined();
- 
-       vi.mocked(db.log.findMany).mockResolvedValue([
-         { id: "log-123", tool_name: "test_tool", decision: "ALLOW" }
-       ] as any);
- 
-       const req = {} as Request;
-       const res = mockResponse();
- 
-       await getLogs(req, res, () => {});
- 
-       expect(db.log.findMany).toHaveBeenCalledWith({
-         orderBy: { createdAt: "desc" },
-         take: 100
-       });
-       expect(res.json).toHaveBeenCalledWith([
-         { id: "log-123", tool_name: "test_tool", decision: "ALLOW" }
-       ]);
+  });
+
+  describe("GET /logs", () => {
+    it("should return a list of decision logs", async () => {
+      const getLogs = getHandler("/logs", "GET");
+      expect(getLogs).toBeDefined();
+
+      vi.mocked(db.log.findMany).mockResolvedValue([
+        { id: "log-123", tool_name: "test_tool", decision: "ALLOW" },
+      ] as any);
+
+      const req = {} as Request;
+      const res = mockResponse();
+
+      await getLogs(req, res, () => {});
+
+      expect(db.log.findMany).toHaveBeenCalledWith({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
+      expect(res.json).toHaveBeenCalledWith([
+        { id: "log-123", tool_name: "test_tool", decision: "ALLOW" },
+      ]);
     });
 
     it("should return 400 for invalid page parameter", async () => {
@@ -1029,7 +1093,9 @@ describe("Policy Engine REST Endpoints", () => {
       await getLogs(req, res, () => {});
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: "page must be a positive integer greater than or equal to 1" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "page must be a positive integer greater than or equal to 1",
+      });
     });
 
     it("should return 400 for invalid limit parameter", async () => {
@@ -1040,7 +1106,9 @@ describe("Policy Engine REST Endpoints", () => {
       await getLogs(req, res, () => {});
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: "limit must be a positive integer between 1 and 100" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "limit must be a positive integer between 1 and 100",
+      });
     });
 
     it("should return 400 for suffix-malformed page parameter", async () => {
@@ -1051,7 +1119,9 @@ describe("Policy Engine REST Endpoints", () => {
       await getLogs(req, res, () => {});
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: "page must be a positive integer greater than or equal to 1" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "page must be a positive integer greater than or equal to 1",
+      });
     });
 
     it("should return 400 for suffix-malformed limit parameter", async () => {
@@ -1062,7 +1132,9 @@ describe("Policy Engine REST Endpoints", () => {
       await getLogs(req, res, () => {});
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: "limit must be a positive integer between 1 and 100" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "limit must be a positive integer between 1 and 100",
+      });
     });
   });
 

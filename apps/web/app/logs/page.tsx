@@ -52,7 +52,11 @@ export default function LogsPage() {
   }, []);
 
   const handleResetLogs = async () => {
-    if (confirm("Are you sure you want to clear all decision logs from the database?")) {
+    if (
+      confirm(
+        "Are you sure you want to clear all decision logs from the database?",
+      )
+    ) {
       try {
         await resetLogs();
         await fetchLogsData();

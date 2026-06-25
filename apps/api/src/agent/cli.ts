@@ -33,28 +33,42 @@ async function sendRequest(payload: any) {
 
     if (data.status === "PENDING") {
       if (!data.approvalId) {
-        console.error("\n❌ Error: PENDING status response is missing approvalId");
+        console.error(
+          "\n❌ Error: PENDING status response is missing approvalId",
+        );
         return;
       }
       // Find the last assistant message containing the tool call details
       const lastMsg = history[history.length - 1];
-      console.log(`\n⚠️  [PENDING APPROVAL] ${lastMsg ? lastMsg.content : "A tool execution requires human approval."}`);
-      
+      console.log(
+        `\n⚠️  [PENDING APPROVAL] ${lastMsg ? lastMsg.content : "A tool execution requires human approval."}`,
+      );
+
       const answer = await askQuestion(`👉 Approve this action? (y/n): `);
-      const approved = answer.trim().toLowerCase() === "y" || answer.trim().toLowerCase() === "yes";
+      const approved =
+        answer.trim().toLowerCase() === "y" ||
+        answer.trim().toLowerCase() === "yes";
 
       const action = approved ? "approve" : "reject";
-      const approvalResponse = await fetch(`${API_URL}/policies/approvals/${data.approvalId}/${action}`, {
-        method: "POST"
-      });
+      const approvalResponse = await fetch(
+        `${API_URL}/policies/approvals/${data.approvalId}/${action}`,
+        {
+          method: "POST",
+        },
+      );
 
       if (!approvalResponse.ok) {
-        console.error(`\n❌ Failed to ${action} approval:`, await approvalResponse.text());
+        console.error(
+          `\n❌ Failed to ${action} approval:`,
+          await approvalResponse.text(),
+        );
         return;
       }
 
-      console.log(`\n✅ Action ${approved ? "approved" : "rejected"}. Resuming agent loop...`);
-      
+      console.log(
+        `\n✅ Action ${approved ? "approved" : "rejected"}. Resuming agent loop...`,
+      );
+
       // Resume agent execution
       await sendRequest({
         message: null,
@@ -63,11 +77,13 @@ async function sendRequest(payload: any) {
         history,
       });
     } else if (data.status === "DENY") {
-      console.log(`\n🚫 [DENIED] Execution blocked: ${data.reason || "Blocked by policy"}`);
+      console.log(
+        `\n🚫 [DENIED] Execution blocked: ${data.reason || "Blocked by policy"}`,
+      );
     } else if (data.status === "SUCCESS") {
       // Print execution log of tools used during the run
       const toolCalls = history.filter(
-        (msg) => msg.role === "assistant" && msg.content.includes("Call tool")
+        (msg) => msg.role === "assistant" && msg.content.includes("Call tool"),
       );
       if (toolCalls.length > 0) {
         console.log("\n🛠️  [TOOL EXECUTION TRACE]");
@@ -85,7 +101,10 @@ async function sendRequest(payload: any) {
       console.log(`\n🤖 [AGENT] ${data.answer}`);
     }
   } catch (error: any) {
-    console.error("\n❌ Error communicating with agent:", error.message || error);
+    console.error(
+      "\n❌ Error communicating with agent:",
+      error.message || error,
+    );
   }
 }
 

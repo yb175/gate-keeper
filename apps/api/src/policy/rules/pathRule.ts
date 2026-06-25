@@ -94,15 +94,37 @@ export default async function withinSandboxPath(
 
     const isPathKey = (key: string): boolean => {
       // Split camelCase by inserting underscore before capital letters
-      const snakeCase = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+      const snakeCase = key
+        .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+        .toLowerCase();
       // Split by non-alphanumeric characters to get individual words
       const words = snakeCase.split(/[^a-z0-9]+/);
 
-      const pathKeywords = ["path", "file", "dir", "folder", "src", "dest", "source", "destination", "filepath", "directory"];
-      const exclusions = ["content", "text", "message", "body", "data", "code", "arguments", "args"];
+      const pathKeywords = [
+        "path",
+        "file",
+        "dir",
+        "folder",
+        "src",
+        "dest",
+        "source",
+        "destination",
+        "filepath",
+        "directory",
+      ];
+      const exclusions = [
+        "content",
+        "text",
+        "message",
+        "body",
+        "data",
+        "code",
+        "arguments",
+        "args",
+      ];
 
       // Check if any word matches path keywords
-      const hasPathKeyword = words.some(w => pathKeywords.includes(w));
+      const hasPathKeyword = words.some((w) => pathKeywords.includes(w));
       if (!hasPathKeyword) {
         return false;
       }
@@ -114,7 +136,15 @@ export default async function withinSandboxPath(
       }
 
       // Check if the key ends with an exclusion suffix (handles cases like filenameContent without separators)
-      if (exclusions.some(exc => snakeCase.endsWith(exc) && !snakeCase.endsWith("path") && !snakeCase.endsWith("file") && !snakeCase.endsWith("dir"))) {
+      if (
+        exclusions.some(
+          (exc) =>
+            snakeCase.endsWith(exc) &&
+            !snakeCase.endsWith("path") &&
+            !snakeCase.endsWith("file") &&
+            !snakeCase.endsWith("dir"),
+        )
+      ) {
         return false;
       }
 
@@ -162,7 +192,9 @@ export default async function withinSandboxPath(
       // Use exact segment boundaries to avoid false-positives on names like "..foo":
       // a path escapes if any segment is exactly "..".
       const relative = nodePath.relative(sandboxRoot, resolved);
-      const escapesViaDotDot = relative.split(nodePath.sep).some(seg => seg === "..");
+      const escapesViaDotDot = relative
+        .split(nodePath.sep)
+        .some((seg) => seg === "..");
       if (escapesViaDotDot || nodePath.isAbsolute(relative)) {
         logger.warn("Path argument escapes sandbox (syntactic check)", {
           tool_name,
@@ -180,15 +212,20 @@ export default async function withinSandboxPath(
       // Edge-case 6: symlink traversal — resolve real ancestor and re-check
       const realResolved = getRealAncestor(resolved);
       const realRelative = nodePath.relative(sandboxRoot, realResolved);
-      const realEscapesViaDotDot = realRelative.split(nodePath.sep).some(seg => seg === "..");
+      const realEscapesViaDotDot = realRelative
+        .split(nodePath.sep)
+        .some((seg) => seg === "..");
       if (realEscapesViaDotDot || nodePath.isAbsolute(realRelative)) {
-        logger.warn("Path argument escapes sandbox via symlink (real path check)", {
-          tool_name,
-          key,
-          value,
-          realResolved,
-          sandbox_path: rawRoot,
-        });
+        logger.warn(
+          "Path argument escapes sandbox via symlink (real path check)",
+          {
+            tool_name,
+            key,
+            value,
+            realResolved,
+            sandbox_path: rawRoot,
+          },
+        );
         return {
           success: true,
           result: true,

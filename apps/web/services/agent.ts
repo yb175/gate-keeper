@@ -18,7 +18,7 @@ export async function runAgentMessage(
   message: string | null,
   conversationId: string,
   approvalId?: string | null,
-  history?: ChatMessage[]
+  history?: ChatMessage[],
 ): Promise<AgentRunResponse> {
   const response = await axios.post<AgentRunResponse>(`${API_URL}/agent/run`, {
     message,
