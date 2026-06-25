@@ -1,12 +1,12 @@
+import "./utils/env.js";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { formatDate } from "@repo/shared";
 import { mcpDiscovery, mcpExecutor } from "../mcp/bootstrap.js";
 import { AppError } from "../types.js";
 import policiesRouter from "./policy/router.js";
-
-dotenv.config();
+import { runAgent } from "./agent/loop.js";
+import { createMemory } from "./agent/memory.js";
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -66,6 +66,76 @@ app.post("/mcp/execute", async (req, res) => {
     } else {
       res.status(500).json({ error: "Failed to execute tool" });
     }
+  }
+});
+
+// Agent execution endpoint
+app.post("/agent/run", async (req, res) => {
+  try {
+    const { message, conversationId, approvalId, history } = req.body;
+
+    if (typeof conversationId !== "string" || conversationId.trim() === "") {
+      return res.status(400).json({ error: "conversationId must be a non-empty string" });
+    }
+
+    if (message !== undefined && message !== null && typeof message !== "string") {
+      return res.status(400).json({ error: "message must be a string or null" });
+    }
+
+    if (approvalId !== undefined && approvalId !== null) {
+      if (typeof approvalId !== "string" || approvalId.trim() === "") {
+        return res.status(400).json({ error: "approvalId must be a non-empty string" });
+      }
+    }
+
+    const hasMessage = typeof message === "string" && message.trim() !== "";
+    const hasApproval = typeof approvalId === "string" && approvalId.trim() !== "";
+    if (!hasMessage && !hasApproval) {
+      return res.status(400).json({ error: "Either message or approvalId must be provided" });
+    }
+
+    if (history !== undefined) {
+      if (!Array.isArray(history)) {
+        return res.status(400).json({ error: "history must be an array" });
+      }
+      if (history.length > 100) {
+        return res.status(400).json({ error: "history size exceeds the limit of 100 items" });
+      }
+      for (const msg of history) {
+        if (!msg || typeof msg !== "object") {
+          return res.status(400).json({ error: "Invalid history message format" });
+        }
+        if (msg.role !== "user" && msg.role !== "assistant" && msg.role !== "tool") {
+          return res.status(400).json({ error: "Invalid message role in history" });
+        }
+        if (typeof msg.content !== "string") {
+          return res.status(400).json({ error: "Invalid message content in history" });
+        }
+      }
+    }
+
+    const memory = createMemory();
+    if (Array.isArray(history)) {
+      for (const msg of history) {
+        memory.addMessage(msg.role, msg.content);
+      }
+    }
+
+    const result = await runAgent(message, conversationId, {
+      memory,
+      approvalId,
+    });
+
+    res.json({
+      status: result.status,
+      answer: result.answer,
+      approvalId: result.approvalId,
+      reason: result.reason,
+      history: result.memory.messages,
+    });
+  } catch (error: any) {
+    console.error("Agent execution failed:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

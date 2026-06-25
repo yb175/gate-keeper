@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "cli": "tsx src/agent/cli.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.4.0",

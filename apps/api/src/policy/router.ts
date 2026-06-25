@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { db, PolicyAction } from "@repo/db";
+import { db, PolicyAction, ApprovalStatus } from "@repo/db";
 
 const router = Router();
 
@@ -184,6 +184,64 @@ router.delete(
       res.status(500).json({ error: "Internal server error" });
     }
   },
+);
+
+async function handleApprovalStatusUpdate(
+  id: string,
+  targetStatus: ApprovalStatus,
+  res: Response
+): Promise<void> {
+  try {
+    const updateResult = await db.approval.updateMany({
+      where: {
+        id,
+        status: ApprovalStatus.PENDING,
+      },
+      data: {
+        status: targetStatus,
+      },
+    });
+
+    if (updateResult.count === 0) {
+      const exists = await db.approval.findUnique({ where: { id } });
+      if (!exists) {
+        res.status(404).json({ error: "Approval not found" });
+        return;
+      }
+      res.status(400).json({ error: "Approval status is not PENDING" });
+      return;
+    }
+
+    res.json({ id, status: targetStatus });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+// POST /policies/approvals/:id/approve
+router.post(
+  "/policies/approvals/:id/approve",
+  async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    if (!id || !id.trim()) {
+      res.status(400).json({ error: "Missing or invalid id parameter" });
+      return;
+    }
+    await handleApprovalStatusUpdate(id.trim(), ApprovalStatus.APPROVED, res);
+  }
+);
+
+// POST /policies/approvals/:id/reject
+router.post(
+  "/policies/approvals/:id/reject",
+  async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    if (!id || !id.trim()) {
+      res.status(400).json({ error: "Missing or invalid id parameter" });
+      return;
+    }
+    await handleApprovalStatusUpdate(id.trim(), ApprovalStatus.REJECTED, res);
+  }
 );
 
 export default router;
