@@ -1,12 +1,12 @@
+import "./utils/env.js";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { formatDate } from "@repo/shared";
 import { mcpDiscovery, mcpExecutor } from "../mcp/bootstrap.js";
 import { AppError } from "../types.js";
 import policiesRouter from "./policy/router.js";
-
-dotenv.config();
+import { runAgent } from "./agent/loop.js";
+import { createMemory } from "./agent/memory.js";
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -66,6 +66,40 @@ app.post("/mcp/execute", async (req, res) => {
     } else {
       res.status(500).json({ error: "Failed to execute tool" });
     }
+  }
+});
+
+// Agent execution endpoint
+app.post("/agent/run", async (req, res) => {
+  try {
+    const { message, conversationId, approvalId, history } = req.body;
+
+    if (!conversationId) {
+      return res.status(400).json({ error: "conversationId is required" });
+    }
+
+    const memory = createMemory();
+    if (Array.isArray(history)) {
+      for (const msg of history) {
+        memory.addMessage(msg.role, msg.content);
+      }
+    }
+
+    const result = await runAgent(message, conversationId, undefined, {
+      memory,
+      approvalId,
+    });
+
+    res.json({
+      status: result.status,
+      answer: result.answer,
+      approvalId: result.approvalId,
+      reason: result.reason,
+      history: result.memory.messages,
+    });
+  } catch (error: any) {
+    console.error("Agent execution failed:", error);
+    res.status(500).json({ error: error.message || "Agent execution failed" });
   }
 });
 

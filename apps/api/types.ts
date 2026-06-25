@@ -48,3 +48,39 @@ export interface ConversationRequest {
   conversationId: string;
   token: number;
 }
+
+export interface Message {
+  role: string;
+  content: string;
+}
+
+export interface Memory {
+  messages: Message[];
+  toolResults: unknown[];
+  approvalId?: string;
+  addMessage(role: string, content: string): void;
+  addToolResult(result: unknown): void;
+  clearApproval(): void;
+  setApproval(approvalId: string | undefined): void;
+}
+
+export interface ToolCall {
+  type: "tool_call";
+  tool_name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface FinalAnswer {
+  type: "final_answer";
+  answer: string;
+}
+
+export type AgentStep = ToolCall | FinalAnswer;
+
+export interface AgentResult {
+  status: "SUCCESS" | "PENDING" | "DENY";
+  answer?: string;
+  approvalId?: string;
+  reason?: string;
+  memory: Memory;
+}

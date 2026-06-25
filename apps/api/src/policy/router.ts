@@ -186,4 +186,50 @@ router.delete(
   },
 );
 
+import { ApprovalStatus } from "@repo/db";
+
+// POST /policies/approvals/:id/approve
+router.post(
+  "/policies/approvals/:id/approve",
+  async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    try {
+      const approval = await db.approval.findUnique({ where: { id } });
+      if (!approval) {
+        res.status(404).json({ error: "Approval not found" });
+        return;
+      }
+      const updated = await db.approval.update({
+        where: { id },
+        data: { status: ApprovalStatus.APPROVED },
+      });
+      res.json({ message: "Approved successfully", approval: updated });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// POST /policies/approvals/:id/reject
+router.post(
+  "/policies/approvals/:id/reject",
+  async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    try {
+      const approval = await db.approval.findUnique({ where: { id } });
+      if (!approval) {
+        res.status(404).json({ error: "Approval not found" });
+        return;
+      }
+      const updated = await db.approval.update({
+        where: { id },
+        data: { status: ApprovalStatus.REJECTED },
+      });
+      res.json({ message: "Rejected successfully", approval: updated });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
 export default router;
