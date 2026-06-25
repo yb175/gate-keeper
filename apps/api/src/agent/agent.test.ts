@@ -377,9 +377,9 @@ describe("Agent Module & Execution Loop", () => {
     );
   });
 
-  // 12) resume failure - approval status is not APPROVED
-  it("scenario 12: agent loop denies execution if resumed approval is not in APPROVED status", async () => {
-    // Mock db.approval.findUnique to return a non-APPROVED record
+  // 12) resume pending - approval status is PENDING
+  it("scenario 12: agent loop returns PENDING if resumed approval is in PENDING status", async () => {
+    // Mock db.approval.findUnique to return a PENDING record
     vi.mocked(db.approval.findUnique).mockResolvedValue({
       id: "approval-998",
       tool_name: "test_tool",
@@ -393,6 +393,28 @@ describe("Agent Module & Execution Loop", () => {
     const result = await runAgent(null, "conv-11", {
       memory,
       approvalId: "approval-998",
+    });
+
+    expect(result.status).toBe("PENDING");
+    expect(result.approvalId).toBe("approval-998");
+  });
+
+  // 13) resume rejected - approval status is REJECTED
+  it("scenario 13: agent loop denies execution if resumed approval is in REJECTED status", async () => {
+    // Mock db.approval.findUnique to return a REJECTED record
+    vi.mocked(db.approval.findUnique).mockResolvedValue({
+      id: "approval-997",
+      tool_name: "test_tool",
+      arguments: { arg1: "resumed-val" },
+      status: "REJECTED" as any,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const memory = createMemory();
+    const result = await runAgent(null, "conv-12", {
+      memory,
+      approvalId: "approval-997",
     });
 
     expect(result.status).toBe("DENY");

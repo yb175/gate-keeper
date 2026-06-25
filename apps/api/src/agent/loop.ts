@@ -92,6 +92,16 @@ export async function runAgent(
           };
         }
 
+        if (approval.status === ApprovalStatus.PENDING) {
+          logger.info("Resumed approval record is still pending", { conversation_id: conversationId, approval_id: activeApprovalId });
+          await updateTokens();
+          return {
+            status: "PENDING",
+            approvalId: activeApprovalId,
+            memory
+          };
+        }
+
         if (approval.status !== ApprovalStatus.APPROVED) {
           logger.warn("Resumed approval record is not approved", { conversation_id: conversationId, approval_id: activeApprovalId, status: approval.status });
           await updateTokens();
