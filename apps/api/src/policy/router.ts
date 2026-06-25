@@ -223,11 +223,11 @@ router.post(
   "/policies/approvals/:id/approve",
   async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    if (!id) {
-      res.status(400).json({ error: "id is required" });
+    if (!id || !id.trim()) {
+      res.status(400).json({ error: "Missing or invalid id parameter" });
       return;
     }
-    await handleApprovalStatusUpdate(id, ApprovalStatus.APPROVED, res);
+    await handleApprovalStatusUpdate(id.trim(), ApprovalStatus.APPROVED, res);
   }
 );
 
@@ -236,11 +236,11 @@ router.post(
   "/policies/approvals/:id/reject",
   async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    if (!id) {
-      res.status(400).json({ error: "id is required" });
+    if (!id || !id.trim()) {
+      res.status(400).json({ error: "Missing or invalid id parameter" });
       return;
     }
-    await handleApprovalStatusUpdate(id, ApprovalStatus.REJECTED, res);
+    await handleApprovalStatusUpdate(id.trim(), ApprovalStatus.REJECTED, res);
   }
 );
 

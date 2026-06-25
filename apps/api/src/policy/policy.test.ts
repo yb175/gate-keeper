@@ -511,4 +511,58 @@ describe("Policy Engine REST Endpoints", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Approval status is not PENDING" });
     });
   });
+
+  describe("POST /policies/approvals/:id/reject", () => {
+    it("should atomically update status using updateMany and return id and status for rejection", async () => {
+      const rejectHandler = getHandler("/policies/approvals/:id/reject", "POST");
+      expect(rejectHandler).toBeDefined();
+
+      vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 1 });
+
+      const req = { params: { id: "app-123" } } as any as Request;
+      const res = mockResponse();
+
+      await rejectHandler(req, res, () => {});
+
+      expect(db.approval.updateMany).toHaveBeenCalledWith({
+        where: { id: "app-123", status: ApprovalStatus.PENDING },
+        data: { status: ApprovalStatus.REJECTED },
+      });
+      expect(res.json).toHaveBeenCalledWith({
+        id: "app-123",
+        status: ApprovalStatus.REJECTED,
+      });
+    });
+
+    it("should return 404 if approval record does not exist on rejection", async () => {
+      const rejectHandler = getHandler("/policies/approvals/:id/reject", "POST");
+      vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
+      vi.mocked(db.approval.findUnique).mockResolvedValue(null);
+
+      const req = { params: { id: "app-invalid" } } as any as Request;
+      const res = mockResponse();
+
+      await rejectHandler(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Approval not found" });
+    });
+
+    it("should return 400 if approval status is not PENDING on rejection", async () => {
+      const rejectHandler = getHandler("/policies/approvals/:id/reject", "POST");
+      vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
+      vi.mocked(db.approval.findUnique).mockResolvedValue({
+        id: "app-123",
+        status: ApprovalStatus.REJECTED,
+      } as any);
+
+      const req = { params: { id: "app-123" } } as any as Request;
+      const res = mockResponse();
+
+      await rejectHandler(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "Approval status is not PENDING" });
+    });
+  });
 });

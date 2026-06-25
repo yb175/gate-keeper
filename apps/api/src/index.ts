@@ -78,6 +78,16 @@ app.post("/agent/run", async (req, res) => {
       return res.status(400).json({ error: "conversationId must be a non-empty string" });
     }
 
+    if (message !== undefined && message !== null && typeof message !== "string") {
+      return res.status(400).json({ error: "message must be a string or null" });
+    }
+
+    if (approvalId !== undefined && approvalId !== null) {
+      if (typeof approvalId !== "string" || approvalId.trim() === "") {
+        return res.status(400).json({ error: "approvalId must be a non-empty string" });
+      }
+    }
+
     if (history !== undefined) {
       if (!Array.isArray(history)) {
         return res.status(400).json({ error: "history must be an array" });
@@ -89,7 +99,7 @@ app.post("/agent/run", async (req, res) => {
         if (!msg || typeof msg !== "object") {
           return res.status(400).json({ error: "Invalid history message format" });
         }
-        if (msg.role !== "user" && msg.role !== "assistant" && msg.role !== "tool" && msg.role !== "system") {
+        if (msg.role !== "user" && msg.role !== "assistant" && msg.role !== "tool") {
           return res.status(400).json({ error: "Invalid message role in history" });
         }
         if (typeof msg.content !== "string") {
