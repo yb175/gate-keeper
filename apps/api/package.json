@@ -21,6 +21,7 @@
     "express": "^4.19.2"
   },
   "devDependencies": {
+    "@modelcontextprotocol/server-puppeteer": "^2025.5.12",
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@types/cors": "^2.8.17",

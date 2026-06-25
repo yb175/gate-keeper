@@ -1,4 +1,4 @@
-import "../../../../src/utils/env.js";
+import "../../../src/utils/env.js";
 import { StdioMCPServer } from "../../stdio-server.js";
 
 const context7Env: Record<string, string> = {};

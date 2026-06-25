@@ -70,12 +70,20 @@ export interface ToolCall {
   arguments: Record<string, unknown>;
 }
 
+export interface ToolCalls {
+  type: "tool_calls";
+  tool_calls: {
+    tool_name: string;
+    arguments: Record<string, unknown>;
+  }[];
+}
+
 export interface FinalAnswer {
   type: "final_answer";
   answer: string;
 }
 
-export type AgentStep = ToolCall | FinalAnswer;
+export type AgentStep = ToolCall | ToolCalls | FinalAnswer;
 
 export interface AgentResult {
   status: "SUCCESS" | "PENDING" | "DENY";

@@ -1,6 +1,7 @@
 import needsApproval from "./rules/approval.js";
 import isblocked from "./rules/block.js";
 import budgetExceeded from "./rules/budget.js";
+import withinSandboxPath from "./rules/pathRule.js";
 import type { ApprovalRequest, ConversationRequest } from "../../types.js";
 import { db } from "@repo/db";
 import { logger } from "../../mcp/logger.js";
@@ -55,7 +56,24 @@ export default async function PolicyEngine(
       };
     }
 
-    // 2. Budget Check
+    // 2. Path Sandbox Check
+    const pathResult = await withinSandboxPath(tool_name, context.arguments, policy);
+    if (!pathResult.success) {
+      return {
+        allowed: false,
+        requiresApproval: false,
+        reason: pathResult.reason,
+      };
+    }
+    if (pathResult.result) {
+      return {
+        allowed: false,
+        requiresApproval: false,
+        reason: pathResult.reason,
+      };
+    }
+
+    // 3. Budget Check
     const budgetResult = await budgetExceeded(
       conversation.conversationId,
       conversation.token,
@@ -75,7 +93,7 @@ export default async function PolicyEngine(
       };
     }
 
-    // 3. Approval Check
+    // 4. Approval Check
     const approvalResult = await needsApproval(tool_name, policy);
     if (!approvalResult.success) {
       return {

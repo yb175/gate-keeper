@@ -33,6 +33,12 @@ vi.mock("@repo/db", () => {
         create: vi.fn(),
         delete: vi.fn(),
         updateMany: vi.fn(),
+        findMany: vi.fn(),
+      },
+      log: {
+        create: vi.fn(),
+        findMany: vi.fn(),
+        deleteMany: vi.fn(),
       },
     },
   };
@@ -45,6 +51,7 @@ import { db, PolicyAction, ApprovalStatus } from "@repo/db";
 import isblocked from "./rules/block.js";
 import budgetExceeded from "./rules/budget.js";
 import needsApproval from "./rules/approval.js";
+import withinSandboxPath from "./rules/pathRule.js";
 import PolicyEngine from "./engine.js";
 import { decide } from "./decision.js";
 import policiesRouter from "./router.js";
@@ -230,6 +237,221 @@ describe("Policy Engine Rules & Orchestrator", () => {
       expect(res.requiresApproval).toBe(false);
       expect(res.reason).toBe("Failed to query policy table");
     });
+
+    it("should deny when path argument escapes the configured sandbox_path", async () => {
+      vi.mocked(db.policy.findUnique).mockResolvedValue({
+        id: "1",
+        tool_name: "write_file",
+        action: PolicyAction.ALLOW,
+        sandbox_path: "/tmp/sandbox",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      vi.mocked(db.conversation.findUnique).mockResolvedValue({
+        id: "conv-1",
+        tokens_used: 10,
+        budget_limit: 100,
+        budget_reset_at: new Date(),
+        createdAt: new Date(),
+      });
+
+      const res = await PolicyEngine(
+        { tool_name: "write_file", arguments: { path: "../../etc/passwd" } },
+        { conversationId: "conv-1", token: 10 },
+      );
+
+      expect(res.allowed).toBe(false);
+      expect(res.requiresApproval).toBe(false);
+      expect(res.reason).toMatch(/escapes the configured sandbox/);
+    });
+
+    it("should allow when path argument is within the configured sandbox_path", async () => {
+      vi.mocked(db.policy.findUnique).mockResolvedValue({
+        id: "1",
+        tool_name: "write_file",
+        action: PolicyAction.ALLOW,
+        sandbox_path: "/tmp/sandbox",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      vi.mocked(db.conversation.findUnique).mockResolvedValue({
+        id: "conv-1",
+        tokens_used: 10,
+        budget_limit: 100,
+        budget_reset_at: new Date(),
+        createdAt: new Date(),
+      });
+
+      const res = await PolicyEngine(
+        { tool_name: "write_file", arguments: { path: "notes/hello.txt" } },
+        { conversationId: "conv-1", token: 10 },
+      );
+
+      // Not blocked, not escaped — ends up at the approval check
+      // (no sandbox_path escape, budget OK → allowed by ALLOW policy)
+      expect(res.allowed).toBe(true);
+      expect(res.requiresApproval).toBe(false);
+    });
+  });
+});
+
+describe("Rule: withinSandboxPath", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should skip the check and return result:false when no sandbox_path is configured", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "write_file",
+      action: PolicyAction.ALLOW,
+      sandbox_path: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await withinSandboxPath("write_file", { path: "../../etc/passwd" });
+    expect(res.success).toBe(true);
+    expect(res.result).toBe(false); // rule skipped — not a violation
+  });
+
+  it("should skip the check when the tool has no string arguments", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "list_files",
+      action: PolicyAction.ALLOW,
+      sandbox_path: "/tmp/sandbox",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await withinSandboxPath("list_files", {});
+    expect(res.success).toBe(true);
+    expect(res.result).toBe(false);
+  });
+
+  it("should return result:false (allowed) for a valid path inside the sandbox", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "write_file",
+      action: PolicyAction.ALLOW,
+      sandbox_path: "/tmp/sandbox",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await withinSandboxPath("write_file", { path: "notes/hello.txt" });
+    expect(res.success).toBe(true);
+    expect(res.result).toBe(false);
+  });
+
+  it("should return result:true (violation) for a relative traversal path", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "write_file",
+      action: PolicyAction.ALLOW,
+      sandbox_path: "/tmp/sandbox",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await withinSandboxPath("write_file", { path: "../../etc/passwd" });
+    expect(res.success).toBe(true);
+    expect(res.result).toBe(true);
+    expect(res.reason).toMatch(/escapes the configured sandbox/);
+  });
+
+  it("should return result:true (violation) for an absolute path that escapes the sandbox", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "read_file",
+      action: PolicyAction.ALLOW,
+      sandbox_path: "/tmp/sandbox",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await withinSandboxPath("read_file", { path: "/etc/passwd" });
+    expect(res.success).toBe(true);
+    expect(res.result).toBe(true);
+    expect(res.reason).toMatch(/escapes the configured sandbox/);
+  });
+
+  it("should return result:false for a path prefixed with the sandbox basename", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "write_file",
+      action: PolicyAction.ALLOW,
+      sandbox_path: "/tmp/sandbox",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // Agent passes "sandbox/notes/file.txt" — the prefix should be stripped
+    const res = await withinSandboxPath("write_file", { path: "sandbox/notes/file.txt" });
+    expect(res.success).toBe(true);
+    expect(res.result).toBe(false);
+  });
+
+  it("should return result:true (violation) for a move_file where destination escapes", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "move_file",
+      action: PolicyAction.ALLOW,
+      sandbox_path: "/tmp/sandbox",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // source is fine, but destination escapes the sandbox
+    const res = await withinSandboxPath("move_file", {
+      source: "notes/file.txt",
+      destination: "../../outside.txt",
+    });
+    expect(res.success).toBe(true);
+    expect(res.result).toBe(true);
+    expect(res.reason).toMatch(/escapes the configured sandbox/);
+  });
+
+  it("should return result:true (violation) for an empty path argument", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "write_file",
+      action: PolicyAction.ALLOW,
+      sandbox_path: "/tmp/sandbox",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await withinSandboxPath("write_file", { path: "" });
+    expect(res.success).toBe(true);
+    expect(res.result).toBe(true);
+    expect(res.reason).toMatch(/must not be empty/);
+  });
+
+  it("should fail closed (success:false) on a database error", async () => {
+    vi.mocked(db.policy.findUnique).mockRejectedValue(new Error("DB failure"));
+
+    const res = await withinSandboxPath("write_file", { path: "file.txt" });
+    expect(res.success).toBe(false);
+    expect(res.result).toBe(false);
+    expect(res.reason).toBe("Failed to evaluate path sandbox rule");
+  });
+
+  it("uses pre-fetched policy and does not call db.policy.findUnique", async () => {
+    const preFetched = {
+      id: "1",
+      tool_name: "write_file",
+      action: PolicyAction.ALLOW,
+      sandbox_path: "/tmp/sandbox",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const res = await withinSandboxPath("write_file", { path: "ok.txt" }, preFetched);
+    expect(db.policy.findUnique).not.toHaveBeenCalled();
+    expect(res.success).toBe(true);
+    expect(res.result).toBe(false);
   });
 });
 
@@ -494,12 +716,28 @@ describe("Policy Engine REST Endpoints", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Approval not found" });
     });
 
-    it("should return 400 if approval status is not PENDING", async () => {
+    it("should return 200 (idempotent) if approval status is already APPROVED", async () => {
       const approveHandler = getHandler("/policies/approvals/:id/approve", "POST");
       vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
       vi.mocked(db.approval.findUnique).mockResolvedValue({
         id: "app-123",
         status: ApprovalStatus.APPROVED,
+      } as any);
+
+      const req = { params: { id: "app-123" } } as any as Request;
+      const res = mockResponse();
+
+      await approveHandler(req, res, () => {});
+
+      expect(res.json).toHaveBeenCalledWith({ id: "app-123", status: ApprovalStatus.APPROVED });
+    });
+
+    it("should return 400 if approval status is REJECTED", async () => {
+      const approveHandler = getHandler("/policies/approvals/:id/approve", "POST");
+      vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
+      vi.mocked(db.approval.findUnique).mockResolvedValue({
+        id: "app-123",
+        status: ApprovalStatus.REJECTED,
       } as any);
 
       const req = { params: { id: "app-123" } } as any as Request;
@@ -548,7 +786,7 @@ describe("Policy Engine REST Endpoints", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Approval not found" });
     });
 
-    it("should return 400 if approval status is not PENDING on rejection", async () => {
+    it("should return 200 (idempotent) if approval status is already REJECTED on rejection", async () => {
       const rejectHandler = getHandler("/policies/approvals/:id/reject", "POST");
       vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
       vi.mocked(db.approval.findUnique).mockResolvedValue({
@@ -561,8 +799,87 @@ describe("Policy Engine REST Endpoints", () => {
 
       await rejectHandler(req, res, () => {});
 
+      expect(res.json).toHaveBeenCalledWith({ id: "app-123", status: ApprovalStatus.REJECTED });
+    });
+
+    it("should return 400 if approval status is APPROVED on rejection", async () => {
+      const rejectHandler = getHandler("/policies/approvals/:id/reject", "POST");
+      vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
+      vi.mocked(db.approval.findUnique).mockResolvedValue({
+        id: "app-123",
+        status: ApprovalStatus.APPROVED,
+      } as any);
+
+      const req = { params: { id: "app-123" } } as any as Request;
+      const res = mockResponse();
+
+      await rejectHandler(req, res, () => {});
+
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({ error: "Approval status is not PENDING" });
+    });
+  });
+
+  describe("GET /approvals", () => {
+    it("should return a list of approvals", async () => {
+      const getApprovals = getHandler("/approvals", "GET");
+      expect(getApprovals).toBeDefined();
+
+      vi.mocked(db.approval.findMany).mockResolvedValue([
+        { id: "app-123", tool_name: "test_tool", status: "PENDING" }
+      ] as any);
+
+      const req = {} as Request;
+      const res = mockResponse();
+
+      await getApprovals(req, res, () => {});
+
+      expect(db.approval.findMany).toHaveBeenCalledWith({
+        orderBy: { createdAt: "desc" }
+      });
+      expect(res.json).toHaveBeenCalledWith([
+        { id: "app-123", tool_name: "test_tool", status: "PENDING" }
+      ]);
+    });
+  });
+
+  describe("GET /logs", () => {
+    it("should return a list of decision logs", async () => {
+      const getLogs = getHandler("/logs", "GET");
+      expect(getLogs).toBeDefined();
+
+      vi.mocked(db.log.findMany).mockResolvedValue([
+        { id: "log-123", tool_name: "test_tool", decision: "ALLOW" }
+      ] as any);
+
+      const req = {} as Request;
+      const res = mockResponse();
+
+      await getLogs(req, res, () => {});
+
+      expect(db.log.findMany).toHaveBeenCalledWith({
+        orderBy: { createdAt: "desc" }
+      });
+      expect(res.json).toHaveBeenCalledWith([
+        { id: "log-123", tool_name: "test_tool", decision: "ALLOW" }
+      ]);
+    });
+  });
+
+  describe("DELETE /logs", () => {
+    it("should delete all logs and return 204", async () => {
+      const deleteLogs = getHandler("/logs", "DELETE");
+      expect(deleteLogs).toBeDefined();
+
+      vi.mocked(db.log.deleteMany).mockResolvedValue({ count: 5 } as any);
+
+      const req = {} as Request;
+      const res = mockResponse();
+
+      await deleteLogs(req, res, () => {});
+
+      expect(db.log.deleteMany).toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(204);
     });
   });
 });

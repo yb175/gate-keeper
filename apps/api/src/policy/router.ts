@@ -208,6 +208,10 @@ async function handleApprovalStatusUpdate(
         res.status(404).json({ error: "Approval not found" });
         return;
       }
+      if (exists.status === targetStatus) {
+        res.json({ id, status: targetStatus });
+        return;
+      }
       res.status(400).json({ error: "Approval status is not PENDING" });
       return;
     }
@@ -243,5 +247,43 @@ router.post(
     await handleApprovalStatusUpdate(id.trim(), ApprovalStatus.REJECTED, res);
   }
 );
+
+// GET /approvals
+router.get("/approvals", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const approvals = await db.approval.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+    res.json(approvals);
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /logs
+router.get("/logs", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const logs = await db.log.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /logs
+router.delete("/logs", async (req: Request, res: Response): Promise<void> => {
+  try {
+    await db.log.deleteMany();
+    res.status(204).end();
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 export default router;
