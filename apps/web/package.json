@@ -15,7 +15,7 @@
     "@repo/ui": "*",
     "axios": "^1.7.9",
     "lucide-react": "^0.468.0",
-    "next": "16.2.0",
+    "next": "^16.2.9",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-redux": "^9.3.0"
