@@ -122,6 +122,13 @@ export async function decide(
               decision: "PENDING",
             };
           case ApprovalStatus.REJECTED:
+            try {
+              await db.approval.delete({
+                where: { id: approval.id },
+              });
+            } catch (err: any) {
+              console.error("Failed to delete approval on parallel rejected resume:", err);
+            }
             for (const tc of toolCalls) {
               await db.log.create({
                 data: {
@@ -206,53 +213,10 @@ export async function decide(
       };
     }
 
-    // Step 1: Call PolicyEngine
-    const policy = await PolicyEngine(context, conversation);
-
-    // Step 2: Policy denied and does not require approval
-    if (!policy.allowed && !policy.requiresApproval) {
-      await db.log.create({
-        data: {
-          tool_name: context.tool_name,
-          decision: "DENY",
-          reason: `Conversation: ${conversation.conversationId} | Blocked: ${policy.reason || "Denied by policy configuration"}`,
-        },
-      });
-      return {
-        decision: "DENY",
-        reason: policy.reason,
-      };
-    }
-
-    // Step 3: Policy requires human approval
-    if (policy.requiresApproval) {
-      if (!context.approvalId) {
-        const created = await db.approval.create({
-          data: {
-            tool_name: context.tool_name,
-            arguments: context.arguments as any,
-            status: ApprovalStatus.PENDING,
-          },
-        });
-
-        await db.log.create({
-          data: {
-            tool_name: context.tool_name,
-            decision: "PENDING",
-            reason: `Conversation: ${conversation.conversationId} | Requires manual approval (ID: ${created.id})`,
-          },
-        });
-
-        return {
-          decision: "PENDING",
-          reason: created.id,
-        };
-      }
-
+    // If context.approvalId is present, we check the status of the approval record
+    if (context.approvalId) {
       const approval = await db.approval.findUnique({
-        where: {
-          id: context.approvalId,
-        },
+        where: { id: context.approvalId },
       });
 
       if (!approval) {
@@ -284,7 +248,30 @@ export async function decide(
       }
 
       switch (approval.status) {
-        case ApprovalStatus.APPROVED:
+        case ApprovalStatus.APPROVED: {
+          // Check if the tool is now blocked by a policy change
+          const policyResult = await PolicyEngine(context, conversation);
+          if (!policyResult.allowed && !policyResult.requiresApproval) {
+            try {
+              await db.approval.delete({
+                where: { id: approval.id },
+              });
+            } catch (err: any) {
+              console.error("Failed to delete approval:", err);
+            }
+            await db.log.create({
+              data: {
+                tool_name: context.tool_name,
+                decision: "DENY",
+                reason: `Conversation: ${conversation.conversationId} | Blocked on resume: ${policyResult.reason || "Denied by policy configuration"}`,
+              },
+            });
+            return {
+              decision: "DENY",
+              reason: `Tool execution blocked on resume: ${context.tool_name} - ${policyResult.reason || "Denied by policy configuration"}`,
+            };
+          }
+
           try {
             await db.approval.delete({
               where: { id: approval.id },
@@ -299,7 +286,7 @@ export async function decide(
             });
             return { decision: "DENY", reason: "Approval record deletion failed" };
           }
-          // Write ALLOW log only after deletion is confirmed
+
           await db.log.create({
             data: {
               tool_name: context.tool_name,
@@ -310,12 +297,19 @@ export async function decide(
           return {
             decision: "ALLOW",
           };
+        }
         case ApprovalStatus.PENDING:
-          // We do not write duplicate pending logs on query iterations
           return {
             decision: "PENDING",
           };
         case ApprovalStatus.REJECTED:
+          try {
+            await db.approval.delete({
+              where: { id: approval.id },
+            });
+          } catch (err: any) {
+            console.error("Failed to delete approval:", err);
+          }
           await db.log.create({
             data: {
               tool_name: context.tool_name,
@@ -340,6 +334,48 @@ export async function decide(
             reason: "Unrecognized approval status",
           };
       }
+    }
+
+    // Step 1: Call PolicyEngine
+    const policy = await PolicyEngine(context, conversation);
+
+    // Step 2: Policy denied and does not require approval
+    if (!policy.allowed && !policy.requiresApproval) {
+      await db.log.create({
+        data: {
+          tool_name: context.tool_name,
+          decision: "DENY",
+          reason: `Conversation: ${conversation.conversationId} | Blocked: ${policy.reason || "Denied by policy configuration"}`,
+        },
+      });
+      return {
+        decision: "DENY",
+        reason: policy.reason,
+      };
+    }
+
+    // Step 3: Policy requires human approval
+    if (policy.requiresApproval) {
+      const created = await db.approval.create({
+        data: {
+          tool_name: context.tool_name,
+          arguments: context.arguments as any,
+          status: ApprovalStatus.PENDING,
+        },
+      });
+
+      await db.log.create({
+        data: {
+          tool_name: context.tool_name,
+          decision: "PENDING",
+          reason: `Conversation: ${conversation.conversationId} | Requires manual approval (ID: ${created.id})`,
+        },
+      });
+
+      return {
+        decision: "PENDING",
+        reason: created.id,
+      };
     }
 
     // Step 4: Policy allowed
