@@ -449,5 +449,25 @@ describe("Agent Module & Execution Loop", () => {
 
       await expect(llmClient.callModel("Hello")).rejects.toThrow("The operation was aborted");
     });
+
+    it("should fall back to default timeout and execute normally if env timeout is invalid", async () => {
+      vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+        expect(init?.signal).toBeDefined();
+        return {
+          ok: true,
+          json: async () => ({
+            candidates: [{
+              content: { parts: [{ text: "response-ok" }] }
+            }]
+          })
+        } as any;
+      });
+
+      process.env.GEMINI_API_KEY = "dummy-key";
+      process.env.GEMINI_TIMEOUT_MS = "invalid-value"; // invalid non-number value
+
+      const res = await llmClient.callModel("Hello");
+      expect(res).toBe("response-ok");
+    });
   });
 });
