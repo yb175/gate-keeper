@@ -15,9 +15,9 @@ Here is how the frontend, backend, and MCP servers communicate:
 
 ![System Architecture](./static/system_architecture.png)
 
-1. **Frontend ([apps/web](file:///home/yb175/projects/gate-keeper/apps/web))**: A Next.js dashboard providing a chat interface, policy management panel, approval queue, and audit logs.
-2. **Backend ([apps/api](file:///home/yb175/projects/gate-keeper/apps/api))**: An Express server running the LLM agent loop (supporting Gemini 2.5 Flash and Grok), the policy engine, and the MCP client.
-3. **MCP Servers**: Subprocesses spawned by the backend over Stdio. This includes a custom [file-manager-mcp](file:///home/yb175/projects/gate-keeper/apps/file-manager-mcp) for safe file operations, and external servers like `@upstash/context7-mcp` (for fetching documentation) and `@modelcontextprotocol/server-puppeteer` (for web browsing).
+1. **Frontend**: A Next.js dashboard providing a chat interface, policy management panel, approval queue, and audit logs.
+2. **Backend**: An Express server running the LLM agent loop (supporting Gemini 2.5 Flash and Grok), the policy engine, and the MCP client.
+3. **MCP Servers**: Subprocesses spawned by the backend over Stdio. This includes a custom file-manager-mcp for safe file operations, and external servers like `@upstash/context7-mcp` (for fetching documentation) and `@modelcontextprotocol/server-puppeteer` (for web browsing).
 
 ---
 
