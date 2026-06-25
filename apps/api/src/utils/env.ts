@@ -7,7 +7,14 @@ let currentDir = process.cwd();
 while (currentDir) {
   const envPath = path.join(currentDir, ".env");
   if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
+    const result = dotenv.config({ path: envPath });
+    if (result.error) {
+      throw new Error(`Failed to load/parse env file at ${envPath}: ${result.error.message}`);
+    }
+    break;
+  }
+  // Stop traversing if we hit the monorepo root (contains turbo.json)
+  if (fs.existsSync(path.join(currentDir, "turbo.json"))) {
     break;
   }
   const parent = path.dirname(currentDir);

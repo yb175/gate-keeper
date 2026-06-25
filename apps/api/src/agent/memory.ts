@@ -15,7 +15,7 @@ export function createMemory(): Memory {
     get approvalId() {
       return approvalId;
     },
-    addMessage(role: string, content: string) {
+    addMessage(role: "user" | "assistant" | "tool" | "system", content: string) {
       messages.push({ role, content });
     },
     addToolResult(result: unknown) {

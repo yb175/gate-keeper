@@ -74,8 +74,28 @@ app.post("/agent/run", async (req, res) => {
   try {
     const { message, conversationId, approvalId, history } = req.body;
 
-    if (!conversationId) {
-      return res.status(400).json({ error: "conversationId is required" });
+    if (typeof conversationId !== "string" || conversationId.trim() === "") {
+      return res.status(400).json({ error: "conversationId must be a non-empty string" });
+    }
+
+    if (history !== undefined) {
+      if (!Array.isArray(history)) {
+        return res.status(400).json({ error: "history must be an array" });
+      }
+      if (history.length > 100) {
+        return res.status(400).json({ error: "history size exceeds the limit of 100 items" });
+      }
+      for (const msg of history) {
+        if (!msg || typeof msg !== "object") {
+          return res.status(400).json({ error: "Invalid history message format" });
+        }
+        if (msg.role !== "user" && msg.role !== "assistant" && msg.role !== "tool" && msg.role !== "system") {
+          return res.status(400).json({ error: "Invalid message role in history" });
+        }
+        if (typeof msg.content !== "string") {
+          return res.status(400).json({ error: "Invalid message content in history" });
+        }
+      }
     }
 
     const memory = createMemory();
@@ -85,7 +105,7 @@ app.post("/agent/run", async (req, res) => {
       }
     }
 
-    const result = await runAgent(message, conversationId, undefined, {
+    const result = await runAgent(message, conversationId, {
       memory,
       approvalId,
     });
@@ -99,7 +119,7 @@ app.post("/agent/run", async (req, res) => {
     });
   } catch (error: any) {
     console.error("Agent execution failed:", error);
-    res.status(500).json({ error: error.message || "Agent execution failed" });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

@@ -9,11 +9,12 @@ export const llmClient = {
     }
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
           contents: [{
@@ -75,8 +76,11 @@ export function validateSchema(schema: any, data: any): boolean {
   if (schema.type === "string") {
     return typeof data === "string";
   }
-  if (schema.type === "number" || schema.type === "integer") {
-    return typeof data === "number";
+  if (schema.type === "number") {
+    return typeof data === "number" && !Number.isNaN(data);
+  }
+  if (schema.type === "integer") {
+    return typeof data === "number" && Number.isInteger(data);
   }
   if (schema.type === "boolean") {
     return typeof data === "boolean";
@@ -145,7 +149,7 @@ If you are done and have a final answer, output:
 
   if (parsed.type === "tool_call") {
     const { tool_name, arguments: args } = parsed;
-    if (typeof tool_name !== "string" || !args || typeof args !== "object") {
+    if (typeof tool_name !== "string" || !args || typeof args !== "object" || Array.isArray(args)) {
       throw new Error("Invalid LLM output structure for tool call");
     }
 

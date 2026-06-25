@@ -68,11 +68,13 @@ model Policy {
 }
 
 model Conversation {
-  id            String @id @default(uuid())
+  id              String @id @default(uuid())
 
-  tokens_used   Int @default(0)
+  tokens_used     Int @default(0)
 
-  budget_limit  Int
+  budget_limit    Int
 
-  createdAt     DateTime @default(now())
+  budget_reset_at DateTime @default(now())
+
+  createdAt       DateTime @default(now())
 }

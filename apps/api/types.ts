@@ -50,15 +50,15 @@ export interface ConversationRequest {
 }
 
 export interface Message {
-  role: string;
+  role: "user" | "assistant" | "tool" | "system";
   content: string;
 }
 
 export interface Memory {
-  messages: Message[];
-  toolResults: unknown[];
+  readonly messages: readonly Message[];
+  readonly toolResults: readonly unknown[];
   approvalId?: string;
-  addMessage(role: string, content: string): void;
+  addMessage(role: "user" | "assistant" | "tool" | "system", content: string): void;
   addToolResult(result: unknown): void;
   clearApproval(): void;
   setApproval(approvalId: string | undefined): void;

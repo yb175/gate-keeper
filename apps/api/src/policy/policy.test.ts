@@ -32,6 +32,7 @@ vi.mock("@repo/db", () => {
         findFirst: vi.fn(),
         create: vi.fn(),
         delete: vi.fn(),
+        updateMany: vi.fn(),
       },
     },
   };
@@ -118,6 +119,7 @@ describe("Policy Engine Rules & Orchestrator", () => {
         id: "conv-1",
         tokens_used: 100,
         budget_limit: 1000,
+        budget_reset_at: new Date(),
         createdAt: new Date(),
       });
 
@@ -131,6 +133,7 @@ describe("Policy Engine Rules & Orchestrator", () => {
         id: "conv-1",
         tokens_used: 950,
         budget_limit: 1000,
+        budget_reset_at: new Date(),
         createdAt: new Date(),
       });
 
@@ -202,6 +205,7 @@ describe("Policy Engine Rules & Orchestrator", () => {
         id: "conv-1",
         tokens_used: 10,
         budget_limit: 100,
+        budget_reset_at: new Date(),
         createdAt: new Date(),
       });
 
@@ -247,6 +251,7 @@ describe("Decision Orchestration (decide)", () => {
       id: "conv-1",
       tokens_used: 10,
       budget_limit: 100,
+      budget_reset_at: new Date(),
       createdAt: new Date(),
     });
 
@@ -271,6 +276,7 @@ describe("Decision Orchestration (decide)", () => {
       id: "conv-1",
       tokens_used: 10,
       budget_limit: 100,
+      budget_reset_at: new Date(),
       createdAt: new Date(),
     });
     vi.mocked(db.approval.create).mockResolvedValue({
@@ -311,6 +317,7 @@ describe("Decision Orchestration (decide)", () => {
       id: "conv-1",
       tokens_used: 10,
       budget_limit: 100,
+      budget_reset_at: new Date(),
       createdAt: new Date(),
     });
     vi.mocked(db.approval.findUnique).mockResolvedValue({
@@ -346,6 +353,7 @@ describe("Decision Orchestration (decide)", () => {
       id: "conv-1",
       tokens_used: 10,
       budget_limit: 100,
+      budget_reset_at: new Date(),
       createdAt: new Date(),
     });
     vi.mocked(db.approval.findUnique).mockResolvedValue({
@@ -447,6 +455,60 @@ describe("Policy Engine REST Endpoints", () => {
 
       expect(res.status).toHaveBeenCalledWith(409);
       expect(res.json).toHaveBeenCalledWith({ error: "Policy already exists" });
+    });
+  });
+
+  describe("POST /policies/approvals/:id/approve", () => {
+    it("should atomically update status using updateMany and return id and status", async () => {
+      const approveHandler = getHandler("/policies/approvals/:id/approve", "POST");
+      expect(approveHandler).toBeDefined();
+
+      vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 1 });
+
+      const req = { params: { id: "app-123" } } as any as Request;
+      const res = mockResponse();
+
+      await approveHandler(req, res, () => {});
+
+      expect(db.approval.updateMany).toHaveBeenCalledWith({
+        where: { id: "app-123", status: ApprovalStatus.PENDING },
+        data: { status: ApprovalStatus.APPROVED },
+      });
+      expect(res.json).toHaveBeenCalledWith({
+        id: "app-123",
+        status: ApprovalStatus.APPROVED,
+      });
+    });
+
+    it("should return 404 if approval record does not exist", async () => {
+      const approveHandler = getHandler("/policies/approvals/:id/approve", "POST");
+      vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
+      vi.mocked(db.approval.findUnique).mockResolvedValue(null);
+
+      const req = { params: { id: "app-invalid" } } as any as Request;
+      const res = mockResponse();
+
+      await approveHandler(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Approval not found" });
+    });
+
+    it("should return 400 if approval status is not PENDING", async () => {
+      const approveHandler = getHandler("/policies/approvals/:id/approve", "POST");
+      vi.mocked(db.approval.updateMany).mockResolvedValue({ count: 0 });
+      vi.mocked(db.approval.findUnique).mockResolvedValue({
+        id: "app-123",
+        status: ApprovalStatus.APPROVED,
+      } as any);
+
+      const req = { params: { id: "app-123" } } as any as Request;
+      const res = mockResponse();
+
+      await approveHandler(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "Approval status is not PENDING" });
     });
   });
 });

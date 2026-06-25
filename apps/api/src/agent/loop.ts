@@ -9,7 +9,6 @@ import { Memory, AgentStep, AgentResult, Tool } from "../../types.js";
 export async function runAgent(
   userMessage: string | null,
   conversationId: string,
-  unusedToken?: number,
   options?: {
     memory?: Memory;
     approvalId?: string;
@@ -26,16 +25,16 @@ export async function runAgent(
     },
   });
 
-  // Automatically reset the token budget if 3 minutes (180,000 ms) have passed since creation
+  // Automatically reset the token budget if 3 minutes (180,000 ms) have passed since budget_reset_at
   const threeMinutes = 3 * 60 * 1000;
-  const elapsed = Date.now() - new Date(conversation.createdAt).getTime();
+  const elapsed = Date.now() - new Date(conversation.budget_reset_at).getTime();
   if (elapsed > threeMinutes) {
     logger.info("Resetting conversation budget limit (3-minute window expired)", { conversation_id: conversationId });
     conversation = await db.conversation.update({
       where: { id: conversationId },
       data: {
         tokens_used: 0,
-        createdAt: new Date(),
+        budget_reset_at: new Date(),
       },
     });
   }
@@ -69,8 +68,13 @@ export async function runAgent(
     }
   };
 
+  let iterations = 0;
   try {
     while (true) {
+      iterations++;
+      if (iterations > 30) {
+        throw new Error("Agent loop iteration limit exceeded");
+      }
       let step: AgentStep;
 
       if (activeApprovalId) {
@@ -137,8 +141,10 @@ export async function runAgent(
       }
 
       if (decisionResult.decision === "PENDING") {
-        const approvalId = decisionResult.reason;
-        memory.setApproval(approvalId);
+        const approvalId = decisionResult.reason || activeApprovalId;
+        if (approvalId) {
+          memory.setApproval(approvalId);
+        }
         await updateTokens();
         return {
           status: "PENDING",

@@ -1,4 +1,5 @@
 import readline from "readline";
+import crypto from "crypto";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -7,7 +8,7 @@ const rl = readline.createInterface({
 
 const API_URL = "http://localhost:3001";
 let history: any[] = [];
-const conversationId = "cli-conversation-session";
+const conversationId = crypto.randomUUID();
 
 function askQuestion(query: string): Promise<string> {
   return new Promise((resolve) => rl.question(query, resolve));
@@ -31,6 +32,10 @@ async function sendRequest(payload: any) {
     history = data.history || [];
 
     if (data.status === "PENDING") {
+      if (!data.approvalId) {
+        console.error("\n❌ Error: PENDING status response is missing approvalId");
+        return;
+      }
       // Find the last assistant message containing the tool call details
       const lastMsg = history[history.length - 1];
       console.log(`\n⚠️  [PENDING APPROVAL] ${lastMsg ? lastMsg.content : "A tool execution requires human approval."}`);

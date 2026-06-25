@@ -60,11 +60,11 @@ describe("Agent Module & Execution Loop", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    // Mock conversation database queries
     vi.mocked(db.conversation.findUnique).mockResolvedValue({
       id: "conv-1",
       tokens_used: 0,
       budget_limit: 1000,
+      budget_reset_at: new Date(),
       createdAt: new Date(),
     } as any);
     vi.mocked(db.conversation.update).mockResolvedValue({} as any);
@@ -94,7 +94,7 @@ describe("Agent Module & Execution Loop", () => {
       reason: "approval-uuid-1",
     });
 
-    const result = await runAgent("Perform task", "conv-1", 100);
+    const result = await runAgent("Perform task", "conv-1");
     expect(result.status).toBe("PENDING");
     expect(result.approvalId).toBe("approval-uuid-1");
     expect(decide).toHaveBeenCalledWith(
@@ -115,7 +115,7 @@ describe("Agent Module & Execution Loop", () => {
       })
     );
 
-    const result = await runAgent("Perform task", "conv-1", 100);
+    const result = await runAgent("Perform task", "conv-1");
     expect(result.status).toBe("SUCCESS");
     expect(result.answer).toBe("Task completed successfully.");
     expect(result.memory.messages).toContainEqual({
@@ -139,7 +139,7 @@ describe("Agent Module & Execution Loop", () => {
       reason: "pending-approval-id",
     });
 
-    const result = await runAgent("Start workflow", "conv-2", 200);
+    const result = await runAgent("Start workflow", "conv-2");
     expect(result.status).toBe("PENDING");
     expect(result.approvalId).toBe("pending-approval-id");
     expect(result.memory.approvalId).toBe("pending-approval-id");
@@ -160,7 +160,7 @@ describe("Agent Module & Execution Loop", () => {
       reason: "Tool execution blocked by policy",
     });
 
-    const result = await runAgent("Run forbidden action", "conv-3", 300);
+    const result = await runAgent("Run forbidden action", "conv-3");
     expect(result.status).toBe("DENY");
     expect(result.reason).toBe("Tool execution blocked by policy");
   });
@@ -191,7 +191,7 @@ describe("Agent Module & Execution Loop", () => {
 
     vi.mocked(mcpExecutor.execute).mockResolvedValue("Success output");
 
-    const result = await runAgent("Run action", "conv-4", 400);
+    const result = await runAgent("Run action", "conv-4");
     expect(result.status).toBe("SUCCESS");
     expect(result.answer).toBe("Execution completed successfully.");
     expect(mcpExecutor.execute).toHaveBeenCalledWith(
@@ -212,7 +212,7 @@ describe("Agent Module & Execution Loop", () => {
       })
     );
 
-    await expect(runAgent("Run action", "conv-5", 500)).rejects.toThrow(
+    await expect(runAgent("Run action", "conv-5")).rejects.toThrow(
       "Invalid arguments for tool test_tool"
     );
   });
@@ -226,7 +226,7 @@ describe("Agent Module & Execution Loop", () => {
       })
     );
 
-    await expect(runAgent("Run action", "conv-5", 500)).rejects.toThrow(
+    await expect(runAgent("Run action", "conv-5")).rejects.toThrow(
       "Unknown tool: unknown_tool"
     );
   });
@@ -247,7 +247,7 @@ describe("Agent Module & Execution Loop", () => {
 
     vi.mocked(mcpExecutor.execute).mockRejectedValue(new Error("Executor crash"));
 
-    await expect(runAgent("Fail task", "conv-6", 600)).rejects.toThrow(
+    await expect(runAgent("Fail task", "conv-6")).rejects.toThrow(
       "Tool execution failed: Executor crash"
     );
   });
@@ -256,7 +256,7 @@ describe("Agent Module & Execution Loop", () => {
   it("scenario 8: malformed json from LLM throws error", async () => {
     vi.spyOn(llmClient, "callModel").mockResolvedValue("not-json-format");
 
-    await expect(runAgent("Fail task", "conv-7", 700)).rejects.toThrow(
+    await expect(runAgent("Fail task", "conv-7")).rejects.toThrow(
       "Malformed JSON from LLM response"
     );
   });
@@ -291,7 +291,7 @@ describe("Agent Module & Execution Loop", () => {
     const memory = createMemory();
     memory.addMessage("user", "Run step 1");
     // Resume agent with the approval ID
-    const result = await runAgent(null, "conv-8", 800, {
+    const result = await runAgent(null, "conv-8", {
       memory,
       approvalId: "approval-999",
     });
@@ -315,5 +315,59 @@ describe("Agent Module & Execution Loop", () => {
       { conversationId: "conv-8", decision: "ALLOW" }
     );
     expect(result.memory.toolResults).toContain("Resumed execution success");
+  });
+
+  // 10) iteration limit - LLM repeats tool calls excessively
+  it("scenario 10: agent loop terminates and throws error if iteration limit is exceeded", async () => {
+    // Return a tool call every time so the agent loops continuously
+    vi.spyOn(llmClient, "callModel").mockResolvedValue(
+      JSON.stringify({
+        type: "tool_call",
+        tool_name: "test_tool",
+        arguments: { arg1: "looping" },
+      })
+    );
+    
+    vi.mocked(decide).mockResolvedValue({
+      decision: "ALLOW",
+    });
+
+    vi.mocked(mcpExecutor.execute).mockResolvedValue("Executed ok");
+
+    await expect(runAgent("Loop forever", "conv-9")).rejects.toThrow(
+      "Agent loop iteration limit exceeded"
+    );
+  });
+
+  // 11) budget reset logic - automatically resets if 3 minutes have passed since budget_reset_at
+  it("scenario 11: agent loop resets budget when elapsed time since budget_reset_at is > 3 minutes", async () => {
+    vi.spyOn(llmClient, "callModel").mockResolvedValue(
+      JSON.stringify({
+        type: "final_answer",
+        answer: "Finished",
+      })
+    );
+
+    // Mock upsert to return a conversation that was reset 4 minutes ago
+    const expiredResetAt = new Date(Date.now() - 4 * 60 * 1000);
+    vi.mocked(db.conversation.upsert).mockResolvedValue({
+      id: "conv-10",
+      tokens_used: 15000,
+      budget_limit: 20000,
+      budget_reset_at: expiredResetAt,
+      createdAt: new Date(Date.now() - 10 * 60 * 1000),
+    } as any);
+
+    await runAgent("Reset check", "conv-10");
+
+    expect(db.conversation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "conv-10" },
+        data: expect.objectContaining({
+          tokens_used: 0,
+          budget_reset_at: expect.any(Date),
+        }),
+      })
+    );
   });
 });

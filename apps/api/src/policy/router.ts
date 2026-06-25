@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { db, PolicyAction } from "@repo/db";
+import { db, PolicyAction, ApprovalStatus } from "@repo/db";
 
 const router = Router();
 
@@ -186,27 +186,48 @@ router.delete(
   },
 );
 
-import { ApprovalStatus } from "@repo/db";
+async function handleApprovalStatusUpdate(
+  id: string,
+  targetStatus: ApprovalStatus,
+  res: Response
+): Promise<void> {
+  try {
+    const updateResult = await db.approval.updateMany({
+      where: {
+        id,
+        status: ApprovalStatus.PENDING,
+      },
+      data: {
+        status: targetStatus,
+      },
+    });
+
+    if (updateResult.count === 0) {
+      const exists = await db.approval.findUnique({ where: { id } });
+      if (!exists) {
+        res.status(404).json({ error: "Approval not found" });
+        return;
+      }
+      res.status(400).json({ error: "Approval status is not PENDING" });
+      return;
+    }
+
+    res.json({ id, status: targetStatus });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
 
 // POST /policies/approvals/:id/approve
 router.post(
   "/policies/approvals/:id/approve",
   async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    try {
-      const approval = await db.approval.findUnique({ where: { id } });
-      if (!approval) {
-        res.status(404).json({ error: "Approval not found" });
-        return;
-      }
-      const updated = await db.approval.update({
-        where: { id },
-        data: { status: ApprovalStatus.APPROVED },
-      });
-      res.json({ message: "Approved successfully", approval: updated });
-    } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
+    if (!id) {
+      res.status(400).json({ error: "id is required" });
+      return;
     }
+    await handleApprovalStatusUpdate(id, ApprovalStatus.APPROVED, res);
   }
 );
 
@@ -215,20 +236,11 @@ router.post(
   "/policies/approvals/:id/reject",
   async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    try {
-      const approval = await db.approval.findUnique({ where: { id } });
-      if (!approval) {
-        res.status(404).json({ error: "Approval not found" });
-        return;
-      }
-      const updated = await db.approval.update({
-        where: { id },
-        data: { status: ApprovalStatus.REJECTED },
-      });
-      res.json({ message: "Rejected successfully", approval: updated });
-    } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
+    if (!id) {
+      res.status(400).json({ error: "id is required" });
+      return;
     }
+    await handleApprovalStatusUpdate(id, ApprovalStatus.REJECTED, res);
   }
 );
 
