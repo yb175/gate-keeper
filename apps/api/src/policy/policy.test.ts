@@ -595,6 +595,79 @@ describe("Decision Orchestration (decide)", () => {
     expect(res.decision).toBe("DENY");
     expect(res.reason).toBe("Approval tool name mismatch");
   });
+
+  it("should return ALLOW on parallel approved resume if all tools are allowed by current policy", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "test_tool",
+      action: PolicyAction.ALLOW,
+      sandbox_path: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(db.conversation.findUnique).mockResolvedValue({
+      id: "conv-1",
+      tokens_used: 10,
+      budget_limit: 100,
+      budget_reset_at: new Date(),
+      createdAt: new Date(),
+    });
+    vi.mocked(db.approval.findUnique).mockResolvedValue({
+      id: "app-id-999",
+      tool_name: "multiple_tool_calls",
+      arguments: { tool_calls: [{ tool_name: "test_tool", arguments: {} }] },
+      status: ApprovalStatus.APPROVED,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await decide(
+      { tool_name: "multiple_tool_calls", arguments: { tool_calls: [{ tool_name: "test_tool", arguments: {} }] }, approvalId: "app-id-999" },
+      { conversationId: "conv-1", token: 5 },
+    );
+
+    expect(res.decision).toBe("ALLOW");
+    expect(db.approval.delete).toHaveBeenCalledWith({
+      where: { id: "app-id-999" },
+    });
+  });
+
+  it("should return DENY on parallel approved resume if any tool in batch is explicitly denied", async () => {
+    vi.mocked(db.policy.findUnique).mockResolvedValue({
+      id: "1",
+      tool_name: "denied_tool",
+      action: PolicyAction.DENY,
+      sandbox_path: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(db.conversation.findUnique).mockResolvedValue({
+      id: "conv-1",
+      tokens_used: 10,
+      budget_limit: 100,
+      budget_reset_at: new Date(),
+      createdAt: new Date(),
+    });
+    vi.mocked(db.approval.findUnique).mockResolvedValue({
+      id: "app-id-999",
+      tool_name: "multiple_tool_calls",
+      arguments: { tool_calls: [{ tool_name: "denied_tool", arguments: {} }] },
+      status: ApprovalStatus.APPROVED,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await decide(
+      { tool_name: "multiple_tool_calls", arguments: { tool_calls: [{ tool_name: "denied_tool", arguments: {} }] }, approvalId: "app-id-999" },
+      { conversationId: "conv-1", token: 5 },
+    );
+
+    expect(res.decision).toBe("DENY");
+    expect(res.reason).toContain("Tool execution blocked on resume");
+    expect(db.approval.delete).not.toHaveBeenCalledWith({
+      where: { id: "app-id-999" },
+    });
+  });
 });
 
 describe("Policy Engine REST Endpoints", () => {

@@ -72,6 +72,24 @@ export async function decide(
 
         switch (approval.status) {
           case ApprovalStatus.APPROVED:
+            // Check if any tool in the parallel batch is now blocked by a policy change
+            for (const tc of toolCalls) {
+              const policyResult = await PolicyEngine(tc, conversation);
+              if (!policyResult.allowed && !policyResult.requiresApproval) {
+                await db.log.create({
+                  data: {
+                    tool_name: tc.tool_name,
+                    decision: "DENY",
+                    reason: `Conversation: ${conversation.conversationId} | Blocked on parallel resume: ${policyResult.reason || "Denied by policy configuration"}`,
+                  },
+                });
+                return {
+                  decision: "DENY",
+                  reason: `Tool execution blocked on resume: ${tc.tool_name} - ${policyResult.reason || "Denied by policy configuration"}`,
+                };
+              }
+            }
+
             try {
               await db.approval.delete({
                 where: { id: approval.id },
