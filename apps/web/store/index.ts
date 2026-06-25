@@ -13,6 +13,23 @@ import chatReducer from "./chatSlice";
  *      so it always reads the final committed state via getState(), not an Immer
  *      draft — making reducer tests straightforward and time-travel debugging safe.
  */
+const safeLocalStorage = {
+  setItem(key: string, value: string) {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      console.error(`Failed to write to localStorage for key: ${key}`, e);
+    }
+  },
+  removeItem(key: string) {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.error(`Failed to remove from localStorage for key: ${key}`, e);
+    }
+  }
+};
+
 const chatPersistenceMiddleware: Middleware = (storeAPI) => (next) => (action: any) => {
   const result = next(action); // reducer runs first
 
@@ -21,46 +38,42 @@ const chatPersistenceMiddleware: Middleware = (storeAPI) => (next) => (action: a
   const chat = storeAPI.getState().chat;
 
   switch (action.type) {
-    case "chat/setConversationId":
-      localStorage.setItem("gatekeeper_conversationId", chat.conversationId);
-      break;
-
     case "chat/setMessages":
     case "chat/addMessage":
-      localStorage.setItem("gatekeeper_messages", JSON.stringify(chat.messages));
+      safeLocalStorage.setItem("gatekeeper_messages", JSON.stringify(chat.messages));
       break;
 
     case "chat/setPendingApproval":
       if (chat.pendingApprovalId) {
-        localStorage.setItem("gatekeeper_pendingApprovalId", chat.pendingApprovalId);
+        safeLocalStorage.setItem("gatekeeper_pendingApprovalId", chat.pendingApprovalId);
       } else {
-        localStorage.removeItem("gatekeeper_pendingApprovalId");
+        safeLocalStorage.removeItem("gatekeeper_pendingApprovalId");
       }
       if (chat.pendingToolName) {
-        localStorage.setItem("gatekeeper_pendingToolName", chat.pendingToolName);
+        safeLocalStorage.setItem("gatekeeper_pendingToolName", chat.pendingToolName);
       } else {
-        localStorage.removeItem("gatekeeper_pendingToolName");
+        safeLocalStorage.removeItem("gatekeeper_pendingToolName");
       }
       if (chat.pendingApprovalStatus) {
-        localStorage.setItem("gatekeeper_pendingApprovalStatus", chat.pendingApprovalStatus);
+        safeLocalStorage.setItem("gatekeeper_pendingApprovalStatus", chat.pendingApprovalStatus);
       } else {
-        localStorage.removeItem("gatekeeper_pendingApprovalStatus");
+        safeLocalStorage.removeItem("gatekeeper_pendingApprovalStatus");
       }
       break;
 
     case "chat/hydrateChatState":
       // Persist the generated conversationId if one was created fresh
       if (chat.conversationId) {
-        localStorage.setItem("gatekeeper_conversationId", chat.conversationId);
+        safeLocalStorage.setItem("gatekeeper_conversationId", chat.conversationId);
       }
       break;
 
     case "chat/clearChatState":
-      localStorage.setItem("gatekeeper_conversationId", chat.conversationId);
-      localStorage.removeItem("gatekeeper_messages");
-      localStorage.removeItem("gatekeeper_pendingApprovalId");
-      localStorage.removeItem("gatekeeper_pendingToolName");
-      localStorage.removeItem("gatekeeper_pendingApprovalStatus");
+      safeLocalStorage.setItem("gatekeeper_conversationId", chat.conversationId);
+      safeLocalStorage.removeItem("gatekeeper_messages");
+      safeLocalStorage.removeItem("gatekeeper_pendingApprovalId");
+      safeLocalStorage.removeItem("gatekeeper_pendingToolName");
+      safeLocalStorage.removeItem("gatekeeper_pendingApprovalStatus");
       break;
   }
 

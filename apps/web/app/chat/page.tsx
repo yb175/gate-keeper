@@ -15,6 +15,20 @@ import {
   clearChatState,
 } from "../../store/chatSlice";
 
+function isValidChatMessage(msg: any): msg is ChatMessage {
+  return (
+    msg &&
+    typeof msg === "object" &&
+    (msg.role === "user" || msg.role === "assistant" || msg.role === "tool") &&
+    typeof msg.content === "string"
+  );
+}
+
+function validateChatMessages(messages: any): ChatMessage[] {
+  if (!Array.isArray(messages)) return [];
+  return messages.filter(isValidChatMessage);
+}
+
 export default function ChatPage() {
   const dispatch = useDispatch();
 
@@ -43,7 +57,8 @@ export default function ChatPage() {
       let parsedMessages: ChatMessage[] = [];
       if (savedMessages) {
         try {
-          parsedMessages = JSON.parse(savedMessages);
+          const parsed = JSON.parse(savedMessages);
+          parsedMessages = validateChatMessages(parsed);
         } catch (e) {
           console.error("Error parsing saved messages", e);
         }
@@ -76,7 +91,6 @@ export default function ChatPage() {
     dispatch(setLoading(true));
 
     // If we were waiting for approval but user chose to type message instead, clear approval state
-    const currentApprovalId = pendingApprovalId;
     if (pendingApprovalId) {
       dispatch(setPendingApproval({ id: null, toolName: null }));
     }
@@ -90,7 +104,7 @@ export default function ChatPage() {
       const res = await runAgentMessage(
         userPrompt,
         conversationId,
-        currentApprovalId,
+        null,
         messages // pass existing history
       );
 
@@ -124,13 +138,11 @@ export default function ChatPage() {
     }
   };
 
-  const handleApprove = async (approvalId: string) => {
+  const resumeAgentRun = async (approvalId: string, isApproval: boolean) => {
     dispatch(setLoading(true));
     try {
-      await approveRequest(approvalId);
-      // Resume conversation by calling agent/run with the approved ID
       const res = await runAgentMessage(
-        null, // message is null when resuming
+        null,
         conversationId,
         approvalId,
         messages
@@ -138,11 +150,16 @@ export default function ChatPage() {
 
       if (res.history) {
         dispatch(setMessages(res.history));
-      } else if (res.answer) {
+      } else if (isApproval && res.answer) {
         dispatch(setMessages([...messages, { role: "assistant", content: res.answer! }]));
+      } else if (!isApproval && res.reason) {
+        dispatch(setMessages([
+          ...messages,
+          { role: "assistant", content: `Execution Rejected: ${res.reason}` },
+        ]));
       }
 
-      if (res.status === "PENDING" && res.approvalId) {
+      if (isApproval && res.status === "PENDING" && res.approvalId) {
         let toolName = "requested_tool";
         const lastMsg = res.history[res.history.length - 1];
         if (lastMsg && lastMsg.content.includes("Call tool ")) {
@@ -154,13 +171,30 @@ export default function ChatPage() {
         dispatch(setPendingApproval({ id: null, toolName: null }));
       }
     } catch (err: any) {
-      const errMsg = err.response?.data?.error || "Failed to approve tool execution.";
+      const actionStr = isApproval ? "approve" : "reject";
+      const errMsg = err.response?.data?.error || `An error occurred during execution resume after ${actionStr}.`;
       dispatch(setMessages([
         ...messages,
         { role: "assistant", content: `Error: ${errMsg}` } as ChatMessage,
       ]));
       dispatch(setPendingApproval({ id: null, toolName: null }));
     } finally {
+      dispatch(setLoading(false));
+    }
+  };
+
+  const handleApprove = async (approvalId: string) => {
+    dispatch(setLoading(true));
+    try {
+      await approveRequest(approvalId);
+      await resumeAgentRun(approvalId, true);
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error || "Failed to approve tool execution.";
+      dispatch(setMessages([
+        ...messages,
+        { role: "assistant", content: `Error: ${errMsg}` } as ChatMessage,
+      ]));
+      dispatch(setPendingApproval({ id: null, toolName: null }));
       dispatch(setLoading(false));
     }
   };
@@ -169,24 +203,7 @@ export default function ChatPage() {
     dispatch(setLoading(true));
     try {
       await rejectRequest(approvalId);
-      // Call agent/run to report rejection outcome to agent loop
-      const res = await runAgentMessage(
-        null,
-        conversationId,
-        approvalId,
-        messages
-      );
-
-      if (res.history) {
-        dispatch(setMessages(res.history));
-      } else if (res.reason) {
-        dispatch(setMessages([
-          ...messages,
-          { role: "assistant", content: `Execution Rejected: ${res.reason}` },
-        ]));
-      }
-
-      dispatch(setPendingApproval({ id: null, toolName: null }));
+      await resumeAgentRun(approvalId, false);
     } catch (err: any) {
       const errMsg = err.response?.data?.error || "Failed to reject execution.";
       dispatch(setMessages([
@@ -194,89 +211,23 @@ export default function ChatPage() {
         { role: "assistant", content: `Error: ${errMsg}` } as ChatMessage,
       ]));
       dispatch(setPendingApproval({ id: null, toolName: null }));
-    } finally {
       dispatch(setLoading(false));
     }
   };
 
-  // Sync refs to avoid re-triggering the polling interval on state mutations
+  const handleResumeAfterApproval = async (approvalId: string) => {
+    await resumeAgentRun(approvalId, true);
+  };
+
+  const handleResumeAfterRejection = async (approvalId: string) => {
+    await resumeAgentRun(approvalId, false);
+  };
+ 
   const handleApproveRef = useRef(handleApprove);
   const handleRejectRef = useRef(handleReject);
-  const loadingRef = useRef(loading);
- 
-  const handleResumeAfterApproval = async (approvalId: string) => {
-    dispatch(setLoading(true));
-    try {
-      const res = await runAgentMessage(
-        null,
-        conversationId,
-        approvalId,
-        messages
-      );
- 
-      if (res.history) {
-        dispatch(setMessages(res.history));
-      } else if (res.answer) {
-        dispatch(setMessages([...messages, { role: "assistant", content: res.answer! }]));
-      }
- 
-      if (res.status === "PENDING" && res.approvalId) {
-        let toolName = "requested_tool";
-        const lastMsg = res.history[res.history.length - 1];
-        if (lastMsg && lastMsg.content.includes("Call tool ")) {
-          const match = lastMsg.content.match(/Call tool (\w+)/);
-          toolName = (match && match[1]) || "requested_tool";
-        }
-        dispatch(setPendingApproval({ id: res.approvalId, toolName }));
-      } else {
-        dispatch(setPendingApproval({ id: null, toolName: null }));
-      }
-    } catch (err: any) {
-      const errMsg = err.response?.data?.error || "An error occurred during execution resume.";
-      dispatch(setMessages([
-        ...messages,
-        { role: "assistant", content: `Error: ${errMsg}` } as ChatMessage,
-      ]));
-      dispatch(setPendingApproval({ id: null, toolName: null }));
-    } finally {
-      dispatch(setLoading(false));
-    }
-  };
- 
-  const handleResumeAfterRejection = async (approvalId: string) => {
-    dispatch(setLoading(true));
-    try {
-      const res = await runAgentMessage(
-        null,
-        conversationId,
-        approvalId,
-        messages
-      );
- 
-      if (res.history) {
-        dispatch(setMessages(res.history));
-      } else if (res.reason) {
-        dispatch(setMessages([
-          ...messages,
-          { role: "assistant", content: `Execution Rejected: ${res.reason}` },
-        ]));
-      }
- 
-      dispatch(setPendingApproval({ id: null, toolName: null }));
-    } catch (err: any) {
-      const errMsg = err.response?.data?.error || "Failed to resume after rejection.";
-      dispatch(setMessages([
-        ...messages,
-        { role: "assistant", content: `Error: ${errMsg}` } as ChatMessage,
-      ]));
-      dispatch(setPendingApproval({ id: null, toolName: null }));
-    } finally {
-      dispatch(setLoading(false));
-    }
-  };
- 
   const handleResumeAfterApprovalRef = useRef(handleResumeAfterApproval);
   const handleResumeAfterRejectionRef = useRef(handleResumeAfterRejection);
+  const loadingRef = useRef(loading);
  
   useEffect(() => {
     handleApproveRef.current = handleApprove;

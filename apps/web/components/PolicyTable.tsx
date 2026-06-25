@@ -30,7 +30,7 @@ export default function PolicyTable({
   const [errorMsg, setErrorMsg] = useState("");
  
   const handleOpenAdd = () => {
-    const availableTools = mcpTools.filter(t => !policies.some(p => p.tool_name === t.name));
+    const availableTools = mcpTools.filter(t => !policies.some(p => p.tool_name.trim().toLowerCase() === t.name.trim().toLowerCase()));
     setNewToolName(availableTools[0]?.name || "");
     setNewAction("APPROVAL");
     setErrorMsg("");
@@ -134,7 +134,7 @@ export default function PolicyTable({
               {isAddingInline && (
                 <tr className="bg-zinc-900/50 border-b border-zinc-900">
                   <td className="px-4 py-2">
-                    {mcpTools.filter(t => !policies.some(p => p.tool_name === t.name)).length === 0 ? (
+                    {mcpTools.filter(t => !policies.some(p => p.tool_name.trim().toLowerCase() === t.name.trim().toLowerCase())).length === 0 ? (
                       <span className="text-zinc-500 font-mono text-xs italic">All tools configured</span>
                     ) : (
                       <select
@@ -142,7 +142,7 @@ export default function PolicyTable({
                         onChange={(e) => setNewToolName(e.target.value)}
                         className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono rounded-sm text-xs focus:outline-none focus:border-zinc-500"
                       >
-                        {mcpTools.filter(t => !policies.some(p => p.tool_name === t.name)).map((t) => (
+                        {mcpTools.filter(t => !policies.some(p => p.tool_name.trim().toLowerCase() === t.name.trim().toLowerCase())).map((t) => (
                           <option key={t.name} value={t.name}>{t.name}</option>
                         ))}
                       </select>

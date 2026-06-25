@@ -27,9 +27,7 @@ const chatSlice = createSlice({
   name: "chat",
   initialState,
   reducers: {
-    setConversationId(state, action: PayloadAction<string>) {
-      state.conversationId = action.payload;
-    },
+
     setMessages(state, action: PayloadAction<ChatMessage[]>) {
       state.messages = action.payload;
     },
@@ -80,7 +78,7 @@ const chatSlice = createSlice({
 });
 
 export const {
-  setConversationId,
+
   setMessages,
   addMessage,
   setInputValue,

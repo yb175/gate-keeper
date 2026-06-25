@@ -10,6 +10,7 @@ router.get("/policies", async (req: Request, res: Response): Promise<void> => {
       select: {
         tool_name: true,
         action: true,
+        sandbox_path: true,
       },
     });
     res.json(policies);
@@ -34,6 +35,7 @@ router.get(
         select: {
           tool_name: true,
           action: true,
+          sandbox_path: true,
         },
       });
 
@@ -42,6 +44,7 @@ router.get(
           tool_name: normalizedToolName,
           action: "APPROVAL",
           implicit: true,
+          sandbox_path: null,
         });
         return;
       }
@@ -55,7 +58,7 @@ router.get(
 
 // POST /policies
 router.post("/policies", async (req: Request, res: Response): Promise<void> => {
-  const { tool_name, action } = req.body;
+  const { tool_name, action, sandbox_path } = req.body;
 
   if (!tool_name || typeof tool_name !== "string" || !tool_name.trim()) {
     res.status(400).json({ error: "Missing or invalid tool_name" });
@@ -74,6 +77,11 @@ router.post("/policies", async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
+  if (sandbox_path !== undefined && sandbox_path !== null && typeof sandbox_path !== "string") {
+    res.status(400).json({ error: "sandbox_path must be a string or null" });
+    return;
+  }
+
   try {
     const existing = await db.policy.findUnique({
       where: { tool_name: normalizedToolName },
@@ -88,10 +96,12 @@ router.post("/policies", async (req: Request, res: Response): Promise<void> => {
       data: {
         tool_name: normalizedToolName,
         action: action as PolicyAction,
+        sandbox_path: sandbox_path || null,
       },
       select: {
         tool_name: true,
         action: true,
+        sandbox_path: true,
       },
     });
 
@@ -114,16 +124,23 @@ router.patch(
       res.status(400).json({ error: "Missing or invalid toolName parameter" });
       return;
     }
-    const { action } = req.body;
+    const { action, sandbox_path } = req.body;
     const normalizedToolName = toolName.trim();
 
-    if (
-      !action ||
-      !Object.values(PolicyAction).includes(action as PolicyAction)
-    ) {
+    if (action !== undefined && !Object.values(PolicyAction).includes(action as PolicyAction)) {
       res.status(400).json({
         error: "Invalid action. Accepted values are ALLOW, APPROVAL, DENY",
       });
+      return;
+    }
+
+    if (sandbox_path !== undefined && sandbox_path !== null && typeof sandbox_path !== "string") {
+      res.status(400).json({ error: "sandbox_path must be a string or null" });
+      return;
+    }
+
+    if (action === undefined && sandbox_path === undefined) {
+      res.status(400).json({ error: "Either action or sandbox_path must be provided to update" });
       return;
     }
 
@@ -137,14 +154,21 @@ router.patch(
         return;
       }
 
+      const updateData: any = {};
+      if (action !== undefined) {
+        updateData.action = action as PolicyAction;
+      }
+      if (sandbox_path !== undefined) {
+        updateData.sandbox_path = sandbox_path;
+      }
+
       const updated = await db.policy.update({
         where: { tool_name: normalizedToolName },
-        data: {
-          action: action as PolicyAction,
-        },
+        data: updateData,
         select: {
           tool_name: true,
           action: true,
+          sandbox_path: true,
         },
       });
 
@@ -251,6 +275,31 @@ router.post(
 // GET /approvals
 router.get("/approvals", async (req: Request, res: Response): Promise<void> => {
   try {
+    const page = req.query?.page ? parseInt(req.query.page as string) : undefined;
+    const limit = req.query?.limit ? parseInt(req.query.limit as string) : undefined;
+
+    if (page !== undefined || limit !== undefined) {
+      const p = page || 1;
+      const l = limit || 100;
+      const skip = (p - 1) * l;
+      const total = await db.approval.count();
+      const approvals = await db.approval.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: l,
+      });
+      res.json({
+        data: approvals,
+        pagination: {
+          total,
+          page: p,
+          limit: l,
+          pages: Math.ceil(total / l),
+        }
+      });
+      return;
+    }
+
     const approvals = await db.approval.findMany({
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -264,6 +313,31 @@ router.get("/approvals", async (req: Request, res: Response): Promise<void> => {
 // GET /logs
 router.get("/logs", async (req: Request, res: Response): Promise<void> => {
   try {
+    const page = req.query?.page ? parseInt(req.query.page as string) : undefined;
+    const limit = req.query?.limit ? parseInt(req.query.limit as string) : undefined;
+
+    if (page !== undefined || limit !== undefined) {
+      const p = page || 1;
+      const l = limit || 100;
+      const skip = (p - 1) * l;
+      const total = await db.log.count();
+      const logs = await db.log.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: l,
+      });
+      res.json({
+        data: logs,
+        pagination: {
+          total,
+          page: p,
+          limit: l,
+          pages: Math.ceil(total / l),
+        }
+      });
+      return;
+    }
+
     const logs = await db.log.findMany({
       orderBy: { createdAt: "desc" },
       take: 100,

@@ -92,13 +92,22 @@ export default async function withinSandboxPath(
     // Resolve the real sandbox root (handles the root being a symlink itself)
     const sandboxRoot = resolveSandboxRoot(rawRoot);
 
-    // Only inspect argument keys that are known to carry file-system paths.
-    // Checking every string value (e.g. write_file's 'content' field) would
-    // trigger false DENY results for legitimate content containing ".." sequences.
-    const PATH_KEYS = new Set(["path", "source", "destination", "directory"]);
+    // Inspect argument keys that carry file-system paths.
+    // To prevent failing open on new tools, we match any key containing path-like
+    // terms (like filePath or targetPath), while excluding content fields (like
+    // fileContent or text) to prevent false positives on legitimate content.
+    const isPathKey = (key: string): boolean => {
+      const normalized = key.toLowerCase();
+      const exclusions = ["content", "text", "message", "body", "data", "code", "arguments", "args"];
+      if (exclusions.some(exc => normalized.includes(exc))) {
+        return false;
+      }
+      const pathKeywords = ["path", "file", "dir", "folder", "src", "dest", "source", "destination"];
+      return pathKeywords.some(keyword => normalized.includes(keyword));
+    };
 
     const pathArgs = Object.entries(args)
-      .filter(([k, v]) => PATH_KEYS.has(k) && typeof v === "string")
+      .filter(([k, v]) => isPathKey(k) && typeof v === "string")
       .map(([k, v]) => ({ key: k, value: v as string }));
 
     // If the tool takes no string arguments, there is nothing to check

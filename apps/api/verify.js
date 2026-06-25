@@ -20,6 +20,7 @@ async function runVerification() {
   // obj   = policy existed (restore its original action on cleanup)
   let originalWriteFilePolicy = null;
   let policyWasCreatedByVerify = false;
+  let hasFailed = false;
 
   // Track created sandbox files so we can delete them in finally
   const createdFiles = [];
@@ -42,19 +43,26 @@ async function runVerification() {
     console.log("\n[2] Ensuring write_file policy is APPROVAL for verification...");
     if (originalWriteFilePolicy) {
       if (originalWriteFilePolicy.action !== "APPROVAL") {
-        await fetch(`${API_URL}/policies/write_file`, {
+        const patchRes = await fetch(`${API_URL}/policies/write_file`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "APPROVAL" }),
         });
+        if (!patchRes.ok) {
+          throw new Error(`Failed to ensure write_file policy is APPROVAL (PATCH status: ${patchRes.status})`);
+        }
       }
     } else {
-      await fetch(`${API_URL}/policies`, {
+      const postRes = await fetch(`${API_URL}/policies`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tool_name: "write_file", action: "APPROVAL" }),
       });
-      policyWasCreatedByVerify = true;
+      if (postRes.ok) {
+        policyWasCreatedByVerify = true;
+      } else {
+        throw new Error(`Failed to create write_file policy (POST status: ${postRes.status})`);
+      }
     }
 
     // 3. Run agent prompt that triggers write_file (should be paused for approval)
@@ -168,6 +176,7 @@ async function runVerification() {
   } catch (error) {
     console.error("\n!!! VERIFICATION FAILED !!!");
     console.error(error.message);
+    hasFailed = true;
   } finally {
     // Always clean up sandbox files and restore policy state, even on failure.
     console.log("\n[cleanup] Removing created sandbox files...");
@@ -186,22 +195,30 @@ async function runVerification() {
     try {
       if (policyWasCreatedByVerify) {
         // We created it from scratch — delete it entirely to leave no trace
-        await fetch(`${API_URL}/policies/write_file`, { method: "DELETE" });
+        const res = await fetch(`${API_URL}/policies/write_file`, { method: "DELETE" });
+        if (!res.ok) {
+          throw new Error(`DELETE /policies/write_file failed with status ${res.status}`);
+        }
         console.log("  Deleted write_file policy (was created by verify).");
       } else if (originalWriteFilePolicy) {
         // Restore the original action the policy had before the run
-        await fetch(`${API_URL}/policies/write_file`, {
+        const res = await fetch(`${API_URL}/policies/write_file`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: originalWriteFilePolicy.action }),
         });
+        if (!res.ok) {
+          throw new Error(`PATCH /policies/write_file failed with status ${res.status}`);
+        }
         console.log(`  Restored write_file policy to: ${originalWriteFilePolicy.action}`);
       }
     } catch (cleanupErr) {
       console.error("  Policy cleanup failed:", cleanupErr.message);
     }
-    // Exit with failure code if the try block caught an error
-    // (process.exit in catch is removed; rely on unhandled rejection propagation)
+
+    if (hasFailed) {
+      process.exit(1);
+    }
   }
 }
 

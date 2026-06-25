@@ -77,19 +77,14 @@ export async function decide(
                 where: { id: approval.id },
               });
             } catch (err: any) {
-              // Only ignore "record not found" errors (concurrent resume by poller + manual click).
-              // Any other delete failure is unexpected — log DENY and abort to preserve
-              // single-use protection: if we cannot confirm deletion we must not allow.
-              if (err?.code !== "P2025") {
-                await db.log.create({
-                  data: {
-                    tool_name: "multiple_tool_calls",
-                    decision: "DENY",
-                    reason: `Conversation: ${conversation.conversationId} | Could not delete approval record, aborting to prevent replay (ID: ${approval.id})`,
-                  },
-                });
-                return { decision: "DENY", reason: "Approval record deletion failed" };
-              }
+              await db.log.create({
+                data: {
+                  tool_name: "multiple_tool_calls",
+                  decision: "DENY",
+                  reason: `Conversation: ${conversation.conversationId} | Could not delete approval record, aborting to prevent replay (ID: ${approval.id})`,
+                },
+              });
+              return { decision: "DENY", reason: "Approval record deletion failed" };
             }
             // Log ALLOW for each individual tool call only after confirmed deletion
             for (const tc of toolCalls) {
@@ -277,18 +272,14 @@ export async function decide(
               where: { id: approval.id },
             });
           } catch (err: any) {
-            // Only ignore "record not found" errors (concurrent resume).
-            // Any other failure aborts to preserve single-use protection.
-            if (err?.code !== "P2025") {
-              await db.log.create({
-                data: {
-                  tool_name: context.tool_name,
-                  decision: "DENY",
-                  reason: `Conversation: ${conversation.conversationId} | Could not delete approval record, aborting to prevent replay (ID: ${approval.id})`,
-                },
-              });
-              return { decision: "DENY", reason: "Approval record deletion failed" };
-            }
+            await db.log.create({
+              data: {
+                tool_name: context.tool_name,
+                decision: "DENY",
+                reason: `Conversation: ${conversation.conversationId} | Could not delete approval record, aborting to prevent replay (ID: ${approval.id})`,
+              },
+            });
+            return { decision: "DENY", reason: "Approval record deletion failed" };
           }
           // Write ALLOW log only after deletion is confirmed
           await db.log.create({

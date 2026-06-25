@@ -115,12 +115,12 @@ All arguments safe → proceed to budget check
 
 ### Configuring a sandbox path
 
-Use the `PATCH /policies/:toolName` endpoint to update an existing policy:
+Use the `PATCH /policies/:toolName` endpoint to update an existing policy, optionally configuring its `sandbox_path`:
  
  ```bash
  curl -X PATCH http://localhost:3001/policies/write_file \
    -H 'Content-Type: application/json' \
-   -d '{ "action": "ALLOW" }'
+   -d '{ "action": "ALLOW", "sandbox_path": "/home/user/sandbox" }'
  ```
  
  The file-manager-mcp already enforces its own sandbox internally — the policy-level path rule provides an additional defence-in-depth layer controlled centrally by the admin dashboard.

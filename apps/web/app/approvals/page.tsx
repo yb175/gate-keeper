@@ -8,30 +8,47 @@ export default function ApprovalsPage() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [loading, setLoading] = useState(true);
 
+  let cancelledRef = React.useRef(false);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
+
   const fetchApprovalsData = async () => {
     try {
       const data = await getApprovals();
-      setApprovals(data);
+      if (!cancelledRef.current) {
+        setApprovals(data);
+      }
     } catch (err) {
       console.error("Failed to fetch approvals", err);
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    let cancelled = false;
+    let timeoutId: NodeJS.Timeout;
 
     const poll = async () => {
+      if (cancelledRef.current) return;
       await fetchApprovalsData();
-      if (!cancelled) {
-        // Only schedule the next fetch after the previous one completes
-        setTimeout(poll, 5000);
+      if (!cancelledRef.current) {
+        timeoutId = setTimeout(poll, 5000);
       }
     };
 
     poll();
-    return () => { cancelled = true; };
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   const handleApprove = async (id: string) => {

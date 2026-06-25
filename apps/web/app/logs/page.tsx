@@ -8,30 +8,47 @@ export default function LogsPage() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
 
+  let cancelledRef = React.useRef(false);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
+
   const fetchLogsData = async () => {
     try {
       const data = await getLogs();
-      setLogs(data);
+      if (!cancelledRef.current) {
+        setLogs(data);
+      }
     } catch (err) {
       console.error("Failed to fetch logs", err);
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    let cancelled = false;
+    let timeoutId: NodeJS.Timeout;
 
     const poll = async () => {
+      if (cancelledRef.current) return;
       await fetchLogsData();
-      if (!cancelled) {
-        // Only schedule the next fetch after the previous one completes
-        setTimeout(poll, 5000);
+      if (!cancelledRef.current) {
+        timeoutId = setTimeout(poll, 5000);
       }
     };
 
     poll();
-    return () => { cancelled = true; };
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   const handleResetLogs = async () => {

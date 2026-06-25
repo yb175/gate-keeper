@@ -3,6 +3,45 @@ import { Memory, Tool, ToolCall, FinalAnswer, AgentStep } from "../../types.js";
 
 export const llmClient = {
   async callModel(prompt: string): Promise<string> {
+    if (process.env.MOCK_LLM === "true") {
+      if (prompt.includes("sandbox/test.txt")) {
+        if (prompt.includes("TOOL: ") || prompt.includes("\ntool: ")) {
+          return JSON.stringify({
+            type: "final_answer",
+            answer: "Successfully wrote sandbox/test.txt"
+          });
+        }
+        return JSON.stringify({
+          type: "tool_call",
+          tool_name: "write_file",
+          arguments: {
+            path: "sandbox/test.txt",
+            content: "Hello GateKeeper"
+          }
+        });
+      }
+      if (prompt.includes("sandbox/allowed.txt")) {
+        if (prompt.includes("TOOL: ") || prompt.includes("\ntool: ")) {
+          return JSON.stringify({
+            type: "final_answer",
+            answer: "Successfully wrote sandbox/allowed.txt"
+          });
+        }
+        return JSON.stringify({
+          type: "tool_call",
+          tool_name: "write_file",
+          arguments: {
+            path: "sandbox/allowed.txt",
+            content: "Auto approved content"
+          }
+        });
+      }
+      return JSON.stringify({
+        type: "final_answer",
+        answer: "Mock response."
+      });
+    }
+
     const geminiKey = process.env.GEMINI_API_KEY;
     const grokKey = process.env.GROK_API_KEY ;
 

@@ -173,7 +173,7 @@ export default function ApprovalTable({
                               {app.tool_name === "multiple_tool_calls" ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                   {((app.arguments as any)?.tool_calls || []).map((tc: any, idx: number) => (
-                                    <div key={idx} className="bg-zinc-900 p-2.5 rounded-sm border border-zinc-850 space-y-1">
+                                    <div key={idx} className="bg-zinc-900 p-2.5 rounded-sm border border-zinc-800 space-y-1">
                                       <div className="text-amber-400 text-2xs font-bold font-mono">Tool: {tc.tool_name}</div>
                                       <pre className="text-zinc-300 font-mono text-2xs overflow-x-auto p-1.5 bg-zinc-950 rounded-sm">
                                         {JSON.stringify(tc.arguments, null, 2)}
@@ -182,7 +182,7 @@ export default function ApprovalTable({
                                   ))}
                                 </div>
                               ) : (
-                                <pre className="text-zinc-300 font-mono text-2xs overflow-x-auto p-2 bg-zinc-900 rounded-sm border border-zinc-850">
+                                <pre className="text-zinc-300 font-mono text-2xs overflow-x-auto p-2 bg-zinc-900 rounded-sm border border-zinc-800">
                                   {JSON.stringify(app.arguments, null, 2)}
                                 </pre>
                               )}

@@ -656,6 +656,7 @@ describe("Policy Engine REST Endpoints", () => {
         tool_name: "unknown_tool",
         action: "APPROVAL",
         implicit: true,
+        sandbox_path: null,
       });
     });
   });
