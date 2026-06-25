@@ -901,6 +901,28 @@ describe("Policy Engine REST Endpoints", () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({ error: "limit must be a positive integer between 1 and 100" });
     });
+
+    it("should return 400 for suffix-malformed page parameter", async () => {
+      const getApprovals = getHandler("/approvals", "GET");
+      const req = { query: { page: "1abc" } } as any as Request;
+      const res = mockResponse();
+
+      await getApprovals(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "page must be a positive integer greater than or equal to 1" });
+    });
+
+    it("should return 400 for suffix-malformed limit parameter", async () => {
+      const getApprovals = getHandler("/approvals", "GET");
+      const req = { query: { limit: "10.5" } } as any as Request;
+      const res = mockResponse();
+
+      await getApprovals(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "limit must be a positive integer between 1 and 100" });
+    });
    });
  
    describe("GET /logs", () => {
@@ -924,6 +946,50 @@ describe("Policy Engine REST Endpoints", () => {
        expect(res.json).toHaveBeenCalledWith([
          { id: "log-123", tool_name: "test_tool", decision: "ALLOW" }
        ]);
+    });
+
+    it("should return 400 for invalid page parameter", async () => {
+      const getLogs = getHandler("/logs", "GET");
+      const req = { query: { page: "-1" } } as any as Request;
+      const res = mockResponse();
+
+      await getLogs(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "page must be a positive integer greater than or equal to 1" });
+    });
+
+    it("should return 400 for invalid limit parameter", async () => {
+      const getLogs = getHandler("/logs", "GET");
+      const req = { query: { limit: "150" } } as any as Request;
+      const res = mockResponse();
+
+      await getLogs(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "limit must be a positive integer between 1 and 100" });
+    });
+
+    it("should return 400 for suffix-malformed page parameter", async () => {
+      const getLogs = getHandler("/logs", "GET");
+      const req = { query: { page: "1abc" } } as any as Request;
+      const res = mockResponse();
+
+      await getLogs(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "page must be a positive integer greater than or equal to 1" });
+    });
+
+    it("should return 400 for suffix-malformed limit parameter", async () => {
+      const getLogs = getHandler("/logs", "GET");
+      const req = { query: { limit: "10.5" } } as any as Request;
+      const res = mockResponse();
+
+      await getLogs(req, res, () => {});
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "limit must be a positive integer between 1 and 100" });
     });
   });
 

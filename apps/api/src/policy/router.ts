@@ -280,16 +280,22 @@ function parsePaginationParams(req: Request): { page?: number; limit?: number; e
   let limit: number | undefined;
 
   if (pageStr !== undefined) {
-    const parsedPage = parseInt(pageStr as string, 10);
-    if (Number.isNaN(parsedPage) || parsedPage < 1) {
+    if (typeof pageStr !== "string" || !/^\d+$/.test(pageStr)) {
+      return { error: "page must be a positive integer greater than or equal to 1" };
+    }
+    const parsedPage = parseInt(pageStr, 10);
+    if (parsedPage < 1) {
       return { error: "page must be a positive integer greater than or equal to 1" };
     }
     page = parsedPage;
   }
 
   if (limitStr !== undefined) {
-    const parsedLimit = parseInt(limitStr as string, 10);
-    if (Number.isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
+    if (typeof limitStr !== "string" || !/^\d+$/.test(limitStr)) {
+      return { error: "limit must be a positive integer between 1 and 100" };
+    }
+    const parsedLimit = parseInt(limitStr, 10);
+    if (parsedLimit < 1 || parsedLimit > 100) {
       return { error: "limit must be a positive integer between 1 and 100" };
     }
     limit = parsedLimit;

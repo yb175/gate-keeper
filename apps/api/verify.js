@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const API_URL = "http://localhost:3001";
+const API_URL = process.env.API_URL || "http://localhost:3001";
 // Resolved relative to this script — portable across any checkout location
 const sandboxDir = path.resolve(__dirname, "../file-manager-mcp/sandbox");
 
