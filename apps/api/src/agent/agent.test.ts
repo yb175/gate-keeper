@@ -5,7 +5,13 @@ import { llmClient } from "./llm.js";
 
 // Mock @repo/db
 vi.mock("@repo/db", () => {
+  const ApprovalStatus = {
+    PENDING: "PENDING",
+    APPROVED: "APPROVED",
+    REJECTED: "REJECTED",
+  };
   return {
+    ApprovalStatus,
     db: {
       approval: {
         findUnique: vi.fn(),
@@ -369,5 +375,27 @@ describe("Agent Module & Execution Loop", () => {
         }),
       })
     );
+  });
+
+  // 12) resume failure - approval status is not APPROVED
+  it("scenario 12: agent loop denies execution if resumed approval is not in APPROVED status", async () => {
+    // Mock db.approval.findUnique to return a non-APPROVED record
+    vi.mocked(db.approval.findUnique).mockResolvedValue({
+      id: "approval-998",
+      tool_name: "test_tool",
+      arguments: { arg1: "resumed-val" },
+      status: "PENDING" as any,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const memory = createMemory();
+    const result = await runAgent(null, "conv-11", {
+      memory,
+      approvalId: "approval-998",
+    });
+
+    expect(result.status).toBe("DENY");
+    expect(result.reason).toBe("Approval not approved");
   });
 });

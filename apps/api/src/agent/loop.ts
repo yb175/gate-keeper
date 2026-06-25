@@ -1,4 +1,4 @@
-import { db } from "@repo/db";
+import { db, ApprovalStatus } from "@repo/db";
 import { createMemory } from "./memory.js";
 import { nextStep } from "./llm.js";
 import { decide } from "../policy/decision.js";
@@ -88,6 +88,16 @@ export async function runAgent(
           return {
             status: "DENY",
             reason: "Approval not found",
+            memory
+          };
+        }
+
+        if (approval.status !== ApprovalStatus.APPROVED) {
+          logger.warn("Resumed approval record is not approved", { conversation_id: conversationId, approval_id: activeApprovalId, status: approval.status });
+          await updateTokens();
+          return {
+            status: "DENY",
+            reason: "Approval not approved",
             memory
           };
         }
